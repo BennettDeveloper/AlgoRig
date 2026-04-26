@@ -29,6 +29,6 @@ This also includes learners who:
 
 As a computer science graduate and someone who has helped teach programming concepts, I have seen how difficult it can be for beginners to grasp algorithmic thinking. Many learners struggle not because they lack ability, but because the way concepts are taught feels disconnected from real outcomes.
 
-I want to build a system where programming becomes intuitive and engaging—where users can experiment, fail, and immediately understand why something worked or didn’t. AlgoRig combines my interests in software engineering and game development to create a project that is both meaningful and enjoyable to build.
+I want to build a system where programming becomes intuitive and engaging. This encourages a feedback loop where users can experiment, fail, and immediately understand why something worked or didn’t. AlgoRig combines my interests in software engineering and game development to create a project that is both meaningful and enjoyable to build.
 
 ---
