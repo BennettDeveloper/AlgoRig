@@ -1,0 +1,2 @@
+org.springframework.boot.EnvironmentPostProcessor=\
+  com.algorig.algorig_backend.DotenvEnvironmentPostProcessor
