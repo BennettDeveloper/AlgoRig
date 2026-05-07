@@ -108,7 +108,7 @@ export default function RightPanel() {
   const animClass = direction === 'left' ? 'animate-tip-left' : 'animate-tip-right'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px 14px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px 14px', width: '280px', minWidth: '280px', maxWidth: '280px' }}>
 
       {/* Tips & Tricks */}
       <div>
@@ -119,6 +119,8 @@ export default function RightPanel() {
           border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: '12px',
           overflow: 'hidden',
+          minHeight: '160px',
+          position: 'relative',
         }}>
           {/* Orange accent bar at top */}
           <div style={{
@@ -155,6 +157,11 @@ export default function RightPanel() {
                 fontSize: '12px',
                 color: '#777799',
                 lineHeight: '1.65',
+                height: '60px',
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
               }}>{tip.body}</p>
             </div>
 
