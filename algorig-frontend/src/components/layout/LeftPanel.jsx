@@ -81,6 +81,9 @@ export default function LeftPanel() {
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
+      width: '240px',
+      minWidth: '240px',
+      maxWidth: '240px',
       padding: '24px 12px',
     }}>
       {/* Logo */}
