@@ -175,6 +175,7 @@ export default function BattleLauncher() {
   const [scriptB, setScriptB] = useState(null)
   const [sameScript, setSameScript] = useState(true)
   const [tierCap, setTierCap] = useState(5)
+  const [maxTurns, setMaxTurns] = useState(200)
 
   const [step, setStep] = useState(1)
   const [pickingSlot, setPickingSlot] = useState(null)
@@ -220,6 +221,7 @@ export default function BattleLauncher() {
         scriptAId: scriptA.id,
         scriptBId: sameScript ? scriptA.id : scriptB.id,
         tierCap,
+        maxTurns,
       }
       const res = await startBattle(payload)
       navigate(`/battles/${res.data.id}`)
@@ -360,8 +362,8 @@ export default function BattleLauncher() {
           </div>
 
           {/* Tier cap */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-            <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.12em', color: '#555577' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.12em', color: '#555577', width: 72 }}>
               TIER CAP
             </span>
             {[1, 2, 3, 4, 5].map(t => {
@@ -381,6 +383,32 @@ export default function BattleLauncher() {
                     border: `2px solid ${active ? tc : 'rgba(255,255,255,0.08)'}`,
                     color: active ? tc : '#555577',
                     fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Max turns */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+            <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.12em', color: '#555577', width: 72 }}>
+              MAX TURNS
+            </span>
+            {[10, 25, 50, 100, 200].map(t => {
+              const active = maxTurns === t
+              return (
+                <button
+                  key={t}
+                  onClick={() => setMaxTurns(t)}
+                  style={{
+                    height: 36, padding: '0 10px', borderRadius: 8,
+                    background: active ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: `2px solid ${active ? '#f97316' : 'rgba(255,255,255,0.08)'}`,
+                    color: active ? '#f97316' : '#555577',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -661,7 +689,7 @@ export default function BattleLauncher() {
               </div>
               <div style={{ fontSize: 13 }}>
                 <span style={{ color: '#555577', marginRight: 6 }}>Max Turns</span>
-                <span style={{ color: '#f0f0ff', fontWeight: 700 }}>200</span>
+                <span style={{ color: '#f0f0ff', fontWeight: 700 }}>{maxTurns}</span>
               </div>
             </div>
           </div>

@@ -7,7 +7,7 @@ const primaryActions = [
 ]
 
 const secondaryActions = [
-  { icon: '👁️', label: 'Watch a Battle', to: '/battles' },
+  { icon: '👁️', label: 'Watch a Battle', to: '/battles/new' },
   { icon: '📋', label: 'Browse Scripts', to: '/scripts' },
   { icon: '📊', label: 'Leaderboard', to: '/leaderboard' },
 ]

@@ -24,98 +24,111 @@ function blockToLines(block) {
   return ''
 }
 
-const KNOWN_ACTIONS = new Set([
-  'HardStrike', 'HeavyAttack', 'PowerSurge', 'Patch', 'Firewall',
-  'ArmorPlate', 'VirusUpload', 'SystemScan', 'CpuStall'
-])
+const ACTION_MAP = {
+  'HARDSTRIKE':   { action: 'HardStrike',  color: '#f97316' },
+  'HEAVYATTACK':  { action: 'HeavyAttack', color: '#f97316' },
+  'POWERSURGE':   { action: 'PowerSurge',  color: '#a855f7' },
+  'PATCH':        { action: 'Patch',       color: '#22c55e' },
+  'FIREWALL':     { action: 'Firewall',    color: '#3b82f6' },
+  'ARMORPLATE':   { action: 'ArmorPlate',  color: '#3b82f6' },
+  'VIRUSUPLOAD':  { action: 'VirusUpload', color: '#a855f7' },
+  'SYSTEMSCAN':   { action: 'SystemScan',  color: '#8888aa' },
+  'CPUSTALL':     { action: 'CpuStall',    color: '#444466' },
+  // Backend UPPER_SNAKE_CASE variants
+  'HARD_STRIKE':  { action: 'HardStrike',  color: '#f97316' },
+  'HEAVY_ATTACK': { action: 'HeavyAttack', color: '#f97316' },
+  'POWER_SURGE':  { action: 'PowerSurge',  color: '#a855f7' },
+  'ARMOR_PLATE':  { action: 'ArmorPlate',  color: '#3b82f6' },
+  'VIRUS_UPLOAD': { action: 'VirusUpload', color: '#a855f7' },
+  'SYSTEM_SCAN':  { action: 'SystemScan',  color: '#8888aa' },
+  'CPU_STALL':    { action: 'CpuStall',    color: '#444466' },
+}
 
-const ACTION_COLORS = {
-  HardStrike: '#f97316', HeavyAttack: '#f97316', PowerSurge: '#a855f7',
-  Patch: '#22c55e', Firewall: '#3b82f6', ArmorPlate: '#3b82f6',
-  VirusUpload: '#a855f7', SystemScan: '#8888aa', CpuStall: '#444466'
+function resolveAction(line) {
+  const stripped = line.toUpperCase().replace(/\s+/g, '')
+  const withUnderscores = line.toUpperCase().replace(/\s+/g, '_')
+  return ACTION_MAP[stripped] || ACTION_MAP[withUnderscores] || null
 }
 
 export function scriptToBlocks(text) {
-  const lines = text.split('\n').map(l => l.trimEnd())
-  const blocks = []
-  let i = 0
+  if (!text || !text.trim()) return []
 
-  while (i < lines.length) {
-    const line = lines[i].trim()
-    if (!line) { i++; continue }
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  const topLevel = []
+  const stack = [] // { block, branch }
 
-    if (line.startsWith('IF ')) {
-      const condition = line.slice(3).trim()
-      const result = parseIfBlock(lines, i + 1, condition)
-      blocks.push(result.block)
-      i = result.nextIndex
-    } else if (KNOWN_ACTIONS.has(line)) {
-      blocks.push({
+  for (const line of lines) {
+    const upper = line.toUpperCase().trim()
+
+    if (upper.startsWith('IF ') || upper === 'IF') {
+      const condition = line.length > 3 ? line.substring(3).trim() : ''
+      const newBlock = {
         id: crypto.randomUUID(),
-        type: 'action',
-        action: line,
-        color: ACTION_COLORS[line] || '#8888aa'
-      })
-      i++
-    } else {
-      i++
-    }
-  }
-
-  return blocks
-}
-
-function parseIfBlock(lines, startIndex, condition) {
-  const ifChildren = []
-  const elseChildren = []
-  let isElse = false
-  let i = startIndex
-
-  while (i < lines.length) {
-    const line = lines[i].trim()
-    if (line === 'END IF') {
-      break
-    }
-    if (line === 'ELSE') {
-      isElse = true
-      i++
+        type: 'if',
+        condition,
+        children: [],
+      }
+      stack.push({ block: newBlock, branch: 'if' })
       continue
     }
-    if (line) {
+
+    if (upper === 'ELSE') {
+      if (stack.length > 0) {
+        const top = stack[stack.length - 1]
+        top.block.type = 'ifelse'
+        top.block.ifChildren = top.block.children || []
+        top.block.elseChildren = []
+        delete top.block.children
+        top.branch = 'else'
+      }
+      continue
+    }
+
+    if (upper === 'END IF') {
+      if (stack.length > 0) {
+        const { block } = stack.pop()
+        if (stack.length > 0) {
+          const parent = stack[stack.length - 1]
+          const key = parent.branch === 'else'
+            ? 'elseChildren'
+            : parent.block.type === 'ifelse' ? 'ifChildren' : 'children'
+          if (!parent.block[key]) parent.block[key] = []
+          parent.block[key].push(block)
+        } else {
+          topLevel.push(block)
+        }
+      }
+      continue
+    }
+
+    const actionData = resolveAction(upper)
+    if (actionData) {
       const actionBlock = {
         id: crypto.randomUUID(),
         type: 'action',
-        action: line,
-        color: ACTION_COLORS[line] || '#8888aa'
+        action: actionData.action,
+        color: actionData.color,
       }
-      if (isElse) elseChildren.push(actionBlock)
-      else ifChildren.push(actionBlock)
-    }
-    i++
-  }
-
-  const nextIndex = i + 1
-
-  if (isElse) {
-    return {
-      block: {
-        id: crypto.randomUUID(),
-        type: 'ifelse',
-        condition,
-        ifChildren,
-        elseChildren
-      },
-      nextIndex
+      if (stack.length > 0) {
+        const top = stack[stack.length - 1]
+        if (top.branch === 'else') {
+          if (!top.block.elseChildren) top.block.elseChildren = []
+          top.block.elseChildren.push(actionBlock)
+        } else {
+          const key = top.block.type === 'ifelse' ? 'ifChildren' : 'children'
+          if (!top.block[key]) top.block[key] = []
+          top.block[key].push(actionBlock)
+        }
+      } else {
+        topLevel.push(actionBlock)
+      }
     }
   }
 
-  return {
-    block: {
-      id: crypto.randomUUID(),
-      type: 'if',
-      condition,
-      children: ifChildren
-    },
-    nextIndex
+  // Flush any unclosed IF blocks
+  while (stack.length > 0) {
+    topLevel.push(stack.pop().block)
   }
+
+  return topLevel
 }
