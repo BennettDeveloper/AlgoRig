@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect } from 'react'
 import { useDroppable, useDraggable } from '@dnd-kit/core'
+import ConditionBuilder from './ConditionBuilder'
 import {
   SortableContext,
   useSortable,
@@ -358,21 +359,9 @@ function IfBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, o
         <span style={{ color: amber, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 700, marginRight: 6 }}>
           IF
         </span>
-        <input
-          value={block.condition || ''}
-          onChange={e => onUpdate(block.id, { condition: e.target.value })}
-          placeholder="condition..."
-          style={{
-            background: 'rgba(0,0,0,0.3)',
-            border: `1px solid rgba(${amberRgb}, 0.3)`,
-            borderRadius: 6,
-            padding: '4px 10px',
-            color: '#f0f0ff',
-            fontFamily: 'JetBrains Mono, monospace',
-            fontSize: 13,
-            width: 200,
-            outline: 'none',
-          }}
+        <ConditionBuilder
+          condition={block.condition || ''}
+          onChange={condition => onUpdate(block.id, { condition })}
         />
         <div style={{ flex: 1 }} />
         <button

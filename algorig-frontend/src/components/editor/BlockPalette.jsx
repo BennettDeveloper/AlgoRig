@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
+import { useTooltip } from './TooltipContext'
+import { BLOCK_TOOLTIPS } from './blockTooltips'
 
 const palette = [
   {
@@ -62,9 +64,11 @@ function DraggablePaletteBlock({ item, onAddBlock }) {
       color: item.color,
     },
   })
+  const { showTooltip, moveTooltip, hideTooltip } = useTooltip()
 
   const color = item.color || '#8888aa'
   const rgb = hexToRgb(color)
+  const tooltipKey = item.action || item.label
 
   return (
     <div
@@ -86,8 +90,16 @@ function DraggablePaletteBlock({ item, onAddBlock }) {
         transition: 'all 0.15s ease',
         userSelect: 'none',
       }}
-      onMouseEnter={e => { if (!isDragging) e.currentTarget.style.background = `rgba(${rgb}, 0.2)` }}
-      onMouseLeave={e => { e.currentTarget.style.background = `rgba(${rgb}, 0.1)` }}
+      onMouseEnter={e => {
+        if (!isDragging) e.currentTarget.style.background = `rgba(${rgb}, 0.2)`
+        const tooltipData = BLOCK_TOOLTIPS[tooltipKey]
+        if (tooltipData) showTooltip(e, tooltipData)
+      }}
+      onMouseMove={moveTooltip}
+      onMouseLeave={e => {
+        e.currentTarget.style.background = `rgba(${rgb}, 0.1)`
+        hideTooltip()
+      }}
     >
       {item.label}
     </div>

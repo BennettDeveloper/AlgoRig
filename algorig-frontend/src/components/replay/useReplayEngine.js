@@ -77,24 +77,33 @@ export default function useReplayEngine(log) {
 
   // Reconstruct HP and battery state at a given log index
   const getHpState = useCallback((upToIndex) => {
-    if (log.length === 0) return { hpA: null, hpB: null, battA: null }
-
-    // Use the last entry up to upToIndex for each robot
-    let hpA = null, hpB = null, battA = null
+    if (upToIndex < 0 || log.length === 0) {
+      return { hpA: null, hpB: null, batteryA: null, batteryB: null }
+    }
+    let hpA = null, hpB = null, batteryA = null, batteryB = null
 
     for (let i = 0; i <= upToIndex && i < log.length; i++) {
       const e = log[i]
+      if (!e || e.entryType === 'CONDITION_CHECK') continue
+
+      if (e.entryType === 'BATTERY_DRAIN') {
+        if (e.actor === 'A') batteryA = e.attackerBatteryAfter
+        else batteryB = e.attackerBatteryAfter
+        continue
+      }
+
       if (e.actor === 'A') {
         hpA = e.attackerHpAfter
-        hpB = e.defenderHpAfter
-        battA = e.attackerBatteryAfter
+        batteryA = e.attackerBatteryAfter
+        if (e.defenderHpAfter !== undefined) hpB = e.defenderHpAfter
       } else {
         hpB = e.attackerHpAfter
-        hpA = e.defenderHpAfter
+        batteryB = e.attackerBatteryAfter
+        if (e.defenderHpAfter !== undefined) hpA = e.defenderHpAfter
       }
     }
 
-    return { hpA, hpB, battA }
+    return { hpA, hpB, batteryA, batteryB }
   }, [log])
 
   const currentEvent = currentIndex >= 0 && currentIndex < log.length ? log[currentIndex] : null

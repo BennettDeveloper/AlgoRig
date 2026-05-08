@@ -16,14 +16,12 @@ function computeStats(scriptContent) {
 
 export default function ValidationPanel({
   scriptContent,
-  scriptName,
-  scriptId,
   validationResult,
   setValidationResult,
   isValidating,
   setIsValidating,
   isSaving,
-  setIsSaving,
+  onSave,
 }) {
   const stats = computeStats(scriptContent)
 
@@ -39,21 +37,6 @@ export default function ValidationPanel({
       })
     } finally {
       setIsValidating(false)
-    }
-  }
-
-  const handleSave = async () => {
-    setIsSaving(true)
-    try {
-      if (scriptId) {
-        await apiClient.put(`/scripts/${scriptId}`, { name: scriptName, content: scriptContent })
-      } else {
-        await apiClient.post('/scripts', { name: scriptName, content: scriptContent })
-      }
-    } catch (err) {
-      console.error('Save failed', err)
-    } finally {
-      setIsSaving(false)
     }
   }
 
@@ -142,7 +125,7 @@ export default function ValidationPanel({
       <div style={{ flex: 1 }} />
 
       <button
-        onClick={handleSave}
+        onClick={onSave}
         disabled={isSaving || validationResult?.valid !== true}
         style={{
           width: '100%',

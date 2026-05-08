@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import client from '../api/client'
 import {
   DndContext,
   DragOverlay,
@@ -11,6 +12,7 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import BlockPalette from '../components/editor/BlockPalette'
+import { TooltipProvider } from '../components/editor/TooltipContext'
 import BlockCanvas from '../components/editor/BlockCanvas'
 import TextEditor from '../components/editor/TextEditor'
 import ValidationPanel from '../components/editor/ValidationPanel'
@@ -44,8 +46,88 @@ function branchKey(blockType, branch) {
   return 'children'
 }
 
+function SaveConfirmModal({ script, onKeepEditing, onBackToScripts }) {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const timer = setTimeout(() => navigate('/scripts'), 4000)
+    return () => clearTimeout(timer)
+  }, [navigate])
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+      backdropFilter: 'blur(8px)', zIndex: 300,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: '#0f0f1a',
+        border: '1px solid rgba(34,197,94,0.3)',
+        borderRadius: 20, padding: 40, width: 420, textAlign: 'center',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(34,197,94,0.1)',
+        animation: 'fadeInUp 0.3s ease',
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'rgba(34,197,94,0.15)', border: '2px solid rgba(34,197,94,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 20px', fontSize: 28,
+        }}>
+          ✅
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: '#f0f0ff', marginBottom: 8 }}>
+          Script Saved!
+        </div>
+        <div style={{ fontSize: 14, color: '#8888aa', marginBottom: 6 }}>
+          <span style={{ color: '#f97316', fontWeight: 600 }}>"{script?.name}"</span>
+          {' '}has been saved successfully.
+        </div>
+        <div style={{ fontSize: 12, color: '#444466', fontFamily: 'JetBrains Mono, monospace', marginBottom: 28 }}>
+          Version {script?.version} · Redirecting in 4s...
+        </div>
+        <div style={{ height: 3, background: 'rgba(255,255,255,0.06)', borderRadius: 2, marginBottom: 24, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%',
+            background: 'linear-gradient(90deg, #22c55e, #16a34a)',
+            borderRadius: 2,
+            animation: 'shrink 4s linear forwards',
+          }} />
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onKeepEditing}
+            style={{
+              flex: 1, padding: 11,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 8, color: '#8888aa', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = '#f0f0ff'}
+            onMouseLeave={e => e.currentTarget.style.color = '#8888aa'}
+          >
+            Keep Editing
+          </button>
+          <button
+            onClick={onBackToScripts}
+            style={{
+              flex: 1, padding: 11,
+              background: 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,197,94,0.1))',
+              border: '1px solid rgba(34,197,94,0.3)',
+              borderRadius: 8, color: '#22c55e', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,197,94,0.25)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(34,197,94,0.2), rgba(34,197,94,0.1))'}
+          >
+            Back to Scripts →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ScriptEditor() {
   const { id: scriptId } = useParams()
+  const navigate = useNavigate()
 
   const [scriptName, setScriptName] = useState('Untitled Script')
   const [mode, setMode] = useState('blocks')
@@ -57,6 +139,37 @@ export default function ScriptEditor() {
   const [activeDragItem, setActiveDragItem] = useState(null)
   const [overGapIndex, setOverGapIndex] = useState(null)
   const [overBranch, setOverBranch] = useState(null)
+  const [savedScript, setSavedScript] = useState(null)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+
+  useEffect(() => {
+    if (!scriptId) return
+    client.get(`/scripts/${scriptId}`)
+      .then(res => {
+        const script = res.data
+        setScriptName(script.name)
+        setBlocks(scriptToBlocks(script.content || ''))
+        setTextContent(script.content || '')
+        setMode('blocks')
+      })
+      .catch(err => console.error('Failed to load script:', err))
+  }, [scriptId])
+
+  async function handleSave() {
+    setIsSaving(true)
+    try {
+      const payload = { name: scriptName, content: currentScriptContent }
+      const res = scriptId
+        ? await client.put(`/scripts/${scriptId}`, payload)
+        : await client.post('/scripts', payload)
+      setSavedScript(res.data)
+      setShowSaveModal(true)
+    } catch (err) {
+      console.error('Failed to save:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const dropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({
@@ -263,6 +376,7 @@ export default function ScriptEditor() {
   const overlayLabel = activeDragItem?.label ?? activeDragItem?.action ?? activeDragItem?.block?.action
 
   return (
+    <TooltipProvider>
     <div style={{
       display: 'flex',
       flexDirection: 'column',
@@ -279,6 +393,27 @@ export default function ScriptEditor() {
         background: 'rgba(0,0,0,0.3)',
         flexShrink: 0,
       }}>
+        <button
+          onClick={() => navigate('/scripts')}
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 8, color: '#8888aa',
+            padding: '7px 14px', cursor: 'pointer', fontSize: 13,
+            display: 'flex', alignItems: 'center', gap: 6,
+            transition: 'all 0.15s', flexShrink: 0,
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = '#f0f0ff'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = '#8888aa'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+          }}
+        >
+          ← Scripts
+        </button>
         <input
           value={scriptName}
           onChange={e => setScriptName(e.target.value)}
@@ -339,14 +474,12 @@ export default function ScriptEditor() {
 
           <ValidationPanel
             scriptContent={currentScriptContent}
-            scriptName={scriptName}
-            scriptId={scriptId}
             validationResult={validationResult}
             setValidationResult={setValidationResult}
             isValidating={isValidating}
             setIsValidating={setIsValidating}
             isSaving={isSaving}
-            setIsSaving={setIsSaving}
+            onSave={handleSave}
           />
         </div>
 
@@ -369,6 +502,15 @@ export default function ScriptEditor() {
           )}
         </DragOverlay>
       </DndContext>
+
+      {showSaveModal && savedScript && (
+        <SaveConfirmModal
+          script={savedScript}
+          onKeepEditing={() => setShowSaveModal(false)}
+          onBackToScripts={() => navigate('/scripts')}
+        />
+      )}
     </div>
+    </TooltipProvider>
   )
 }

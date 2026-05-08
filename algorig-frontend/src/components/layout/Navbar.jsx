@@ -4,7 +4,7 @@ const navLinks = [
   { to: '/', label: 'Dashboard' },
   { to: '/robots', label: 'Robots' },
   { to: '/scripts', label: 'Scripts' },
-  { to: '/battles', label: 'Battles' },
+  { to: '/battles/new', label: 'Battles' },
 ]
 
 export default function Navbar() {

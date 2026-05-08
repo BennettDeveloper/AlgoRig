@@ -54,6 +54,11 @@ body {
   50%       { box-shadow: 0 0 24px rgba(249,115,22,0.4); }
 }
 
+@keyframes shrink {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
 @keyframes tipSlideLeft {
   from { opacity: 0; transform: translateX(40px); }
   to   { opacity: 1; transform: translateX(0); }
