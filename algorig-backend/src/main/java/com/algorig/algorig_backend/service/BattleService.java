@@ -42,9 +42,38 @@ public class BattleService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final String BATTLE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final int BATTLE_CODE_GROUP_LENGTH = 5;
+    private static final java.util.Random BATTLE_RANDOM = new java.util.Random();
+
+    private String generateBattleCode() {
+        StringBuilder sb = new StringBuilder("BATTLE-");
+        for (int i = 0; i < BATTLE_CODE_GROUP_LENGTH; i++) {
+            sb.append(BATTLE_ALPHABET.charAt(BATTLE_RANDOM.nextInt(BATTLE_ALPHABET.length())));
+        }
+        sb.append('-');
+        for (int i = 0; i < BATTLE_CODE_GROUP_LENGTH; i++) {
+            sb.append(BATTLE_ALPHABET.charAt(BATTLE_RANDOM.nextInt(BATTLE_ALPHABET.length())));
+        }
+        return sb.toString();
+    }
+
+    private String generateUniqueBattleCode() {
+        String code;
+        int attempts = 0;
+        do {
+            code = generateBattleCode();
+            attempts++;
+            if (attempts > 10) {
+                throw new RuntimeException("Failed to generate unique battle code");
+            }
+        } while (battleRepository.findByBattleCode(code).isPresent());
+        return code;
+    }
+
     @Transactional(readOnly = true)
-    public BattleDto getBattle(Long id, User requestingUser) {
-        Battle battle = battleRepository.findById(id)
+    public BattleDto getBattle(String battleCode, User requestingUser) {
+        Battle battle = battleRepository.findByBattleCode(battleCode)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Battle not found"));
 
         if (battle.isPublic()) return toDto(battle);
@@ -80,7 +109,10 @@ public class BattleService {
             throw new RuntimeException("Failed to serialize battle log", e);
         }
 
+        String battleCode = generateUniqueBattleCode();
+
         Battle battle = Battle.builder()
+                .battleCode(battleCode)
                 .robotAId(request.getRobotAId())
                 .robotBId(request.getRobotBId())
                 .scriptA(scriptA)
@@ -124,6 +156,7 @@ public class BattleService {
         RobotDto robotB = robotRepository.findById(battle.getRobotBId()).map(this::toRobotDto).orElse(null);
         return BattleDto.builder()
                 .id(battle.getId())
+                .battleCode(battle.getBattleCode())
                 .robotAId(battle.getRobotAId())
                 .robotBId(battle.getRobotBId())
                 .scriptAId(battle.getScriptA() != null ? battle.getScriptA().getId() : null)

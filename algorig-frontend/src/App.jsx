@@ -80,7 +80,7 @@ function App() {
           <Route path="battles/new" element={
             <ProtectedRoute><BattleLauncher /></ProtectedRoute>
           } />
-          <Route path="battles/:id" element={
+          <Route path="battles/:battleCode" element={
             <ProtectedRoute><BattleReplay /></ProtectedRoute>
           } />
 

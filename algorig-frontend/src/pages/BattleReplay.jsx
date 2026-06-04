@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getBattle } from '../api/battles'
+import Modal from '../components/ui/Modal'
 import { useToast } from '../context/ToastContext'
 import { RobotSVGA, RobotSVGB } from '../components/replay/RobotSVG'
 import FlashingStatBar from '../components/replay/FlashingStatBar'
@@ -155,13 +156,15 @@ function TurnHeader({ entry, robotA, robotB }) {
 }
 
 export default function BattleReplay() {
-  const { id } = useParams()
+  const { battleCode } = useParams()
   const navigate = useNavigate()
   const { showAchievement } = useToast()
   const [battle, setBattle] = useState(null)
   const [log, setLog] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [copied, setCopied] = useState(false)
   const logRef = useRef(null)
   const toastedRef = useRef(false)
 
@@ -184,8 +187,8 @@ export default function BattleReplay() {
   } = useReplayEngine(log)
 
   useEffect(() => {
-    toastedRef.current = false  // reset for new battle id
-    getBattle(id)
+    toastedRef.current = false
+    getBattle(battleCode)
       .then(battle => {
         setBattle(battle)
         try {
@@ -204,7 +207,7 @@ export default function BattleReplay() {
         else setError('generic')
       })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [battleCode])
 
   // Fire achievement toasts once when battle first loads
   useEffect(() => {
@@ -383,6 +386,21 @@ export default function BattleReplay() {
                 ↺ Rewatch
               </button>
               <button
+                onClick={() => setShowShareModal(true)}
+                style={{
+                  padding: '14px 28px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#d0d0e8', fontSize: 14, fontWeight: 600,
+                  letterSpacing: '0.1em', cursor: 'pointer',
+                  fontFamily: 'JetBrains Mono, monospace', transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
+              >
+                🔗 Share
+              </button>
+              <button
                 onClick={() => navigate('/battles/new')}
                 style={{
                   padding: '14px 32px',
@@ -416,7 +434,7 @@ export default function BattleReplay() {
           ← Back
         </button>
         <div style={{ fontSize: 13, color: '#4a4a6a' }}>
-          BATTLE #{id} &nbsp;·&nbsp; TURN {Math.ceil((currentIndex + 1) / 2)} / {Math.ceil(totalEvents / 2)}
+          {battle?.battleCode || battleCode} &nbsp;·&nbsp; TURN {Math.ceil((currentIndex + 1) / 2)} / {Math.ceil(totalEvents / 2)}
         </div>
         <div style={{ fontSize: 11, color: '#3a3a5a', display: 'flex', alignItems: 'center', gap: 6 }}>
           {battle?.ownerAvatarUrl ? (
@@ -984,6 +1002,69 @@ export default function BattleReplay() {
           <VariablePanel log={log} currentIndex={currentIndex} actor="B" accentColor="#ff3c3c" />
         </div>
       </div>
+
+      <Modal
+        isOpen={showShareModal}
+        onClose={() => { setShowShareModal(false); setCopied(false) }}
+        title="Share Battle"
+        width="480px"
+      >
+        <p style={{ color: '#888', marginBottom: '16px', fontSize: '0.85rem' }}>
+          Share this battle replay with anyone:
+        </p>
+        <div style={{
+          color: '#f97316',
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: '1.1rem',
+          fontWeight: 'bold',
+          marginBottom: '16px',
+          textAlign: 'center',
+        }}>
+          {battle?.battleCode}
+        </div>
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+          background: '#111',
+          borderRadius: '6px',
+          padding: '10px 12px',
+          marginBottom: '16px',
+        }}>
+          <span style={{
+            flex: 1,
+            color: '#ccc',
+            fontSize: '0.8rem',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily: 'JetBrains Mono, monospace',
+          }}>
+            {window.location.origin}/battles/{battle?.battleCode}
+          </span>
+          <button
+            onClick={() => {
+              const url = `${window.location.origin}/battles/${battle?.battleCode}`
+              navigator.clipboard.writeText(url)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            style={{
+              background: copied ? '#22c55e' : '#f97316',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '6px 12px',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              whiteSpace: 'nowrap',
+              transition: 'background 0.2s',
+            }}
+          >
+            {copied ? '✓ Copied!' : '📋 Copy Link'}
+          </button>
+        </div>
+      </Modal>
 
       <style>{`
         @keyframes countdownPop {

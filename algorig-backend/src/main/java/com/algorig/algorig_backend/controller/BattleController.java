@@ -24,10 +24,10 @@ public class BattleController {
         return battleService.startBattle(request, user);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<BattleDto> getBattleById(@PathVariable Long id) {
+    @GetMapping("/{battleCode}")
+    public ResponseEntity<BattleDto> getBattleById(@PathVariable String battleCode) {
         User user = AuthUtil.getCurrentUser();
-        return ResponseEntity.ok(battleService.getBattle(id, user));
+        return ResponseEntity.ok(battleService.getBattle(battleCode, user));
     }
 
     @GetMapping

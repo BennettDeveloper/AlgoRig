@@ -158,6 +158,7 @@ public class RepositoryService {
 
         return BattleDto.builder()
                 .id(battle.getId())
+                .battleCode(battle.getBattleCode())
                 .robotAId(battle.getRobotAId())
                 .robotBId(battle.getRobotBId())
                 .scriptAId(battle.getScriptA() != null ? battle.getScriptA().getId() : null)

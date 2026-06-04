@@ -17,6 +17,9 @@ public class Battle {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "battle_code", unique = true, nullable = false, length = 13)
+    private String battleCode;
+
     private Long robotAId;
     private Long robotBId;
 

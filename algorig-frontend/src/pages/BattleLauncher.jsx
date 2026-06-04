@@ -150,7 +150,7 @@ export default function BattleLauncher() {
         maxTurns,
       }
       const res = await startBattle(payload)
-      navigate(`/battles/${res.id}`)
+      navigate(`/battles/${res.battleCode}`)
     } catch (err) {
       const msg = err.response?.data?.message
         || err.message

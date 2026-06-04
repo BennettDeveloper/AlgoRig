@@ -14,6 +14,7 @@ import java.util.List;
 public class BattleDto {
 
     private Long id;
+    private String battleCode;
     private Long robotAId;
     private Long robotBId;
     private Long scriptAId;

@@ -146,7 +146,7 @@ function ScriptBattleCard({ battle, scriptId }) {
           </span>
           <span style={{ fontSize: 10, color: '#444466' }}>{formatDate(battle.foughtAt)}</span>
         </div>
-        <Link to={`/battles/${battle.id}`}
+        <Link to={`/battles/${battle.battleCode}`}
               style={{
                 padding: '4px 12px',
                 background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)',

@@ -150,7 +150,7 @@ function BattleCard({ battle }) {
           </span>
         </div>
         <Link
-          to={`/battles/${battle.id}`}
+          to={`/battles/${battle.battleCode}`}
           style={{
             padding: '6px 14px',
             background: 'rgba(249,115,22,0.08)',
