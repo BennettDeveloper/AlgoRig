@@ -1,5 +1,8 @@
 package com.algorig.algorig_backend.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,11 +13,22 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(OutOfMemoryError.class)
     public ResponseEntity<Map<String, String>> handleOOM(OutOfMemoryError e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
             "message", "Your battle script is too complex. Try simplifying conditions, reducing nesting, or lowering the turn limit.",
             "type", "OutOfMemoryError"
+        ));
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<Map<String, String>> handleDataAccessException(DataAccessException e) {
+        log.error("Database error: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+            "message", "A database error occurred. Please try again.",
+            "type", "DatabaseError"
         ));
     }
 
@@ -42,14 +56,16 @@ public class GlobalExceptionHandler {
             ));
         }
 
+        log.error("Unhandled runtime error: {}", raw);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-            "message", raw.isEmpty() ? "Server encountered an error. Please try again." : raw,
+            "message", "Battle could not be started. Please try again.",
             "type", "ServerError"
         ));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleGeneral(Exception e) {
+        log.error("Unhandled exception: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
             "message", "Server encountered an error. This is temporary. Please try again.",
             "type", "ServerError"
