@@ -12,4 +12,5 @@ public class BattleRequestDto {
     private Long scriptAId;
     private Long scriptBId;
     private int tierCap;
+    private int maxTurns = 200;
 }

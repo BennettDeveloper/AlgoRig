@@ -2,10 +2,14 @@ package com.algorig.algorig_backend.controller;
 
 import com.algorig.algorig_backend.dto.BattleDto;
 import com.algorig.algorig_backend.dto.BattleRequestDto;
+import com.algorig.algorig_backend.model.entity.User;
 import com.algorig.algorig_backend.service.BattleService;
+import com.algorig.algorig_backend.util.AuthUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/battles")
@@ -16,13 +20,19 @@ public class BattleController {
 
     @PostMapping
     public BattleDto startBattle(@RequestBody BattleRequestDto request) {
-        return battleService.startBattle(request);
+        User user = AuthUtil.getCurrentUser();
+        return battleService.startBattle(request, user);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<BattleDto> getBattleById(@PathVariable Long id) {
-        return battleService.getBattleById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        User user = AuthUtil.getCurrentUser();
+        return ResponseEntity.ok(battleService.getBattle(id, user));
+    }
+
+    @GetMapping
+    public List<BattleDto> getUserBattles() {
+        User user = AuthUtil.getCurrentUser();
+        return battleService.getUserBattles(user);
     }
 }

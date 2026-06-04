@@ -23,4 +23,8 @@ public class RobotDto {
     private int memory;
     private int stability;
     private int recovery;
+
+    private String passiveAbility;
+    private String passiveDisplayName;
+    private String passiveDescription;
 }

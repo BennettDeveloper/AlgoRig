@@ -1,5 +1,6 @@
 package com.algorig.algorig_backend.model.entity;
 
+import com.algorig.algorig_backend.engine.RobotPassive;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -29,4 +30,16 @@ public class Robot {
     private int memory;
     private int stability;
     private int recovery;
+
+    @Column(name = "passive_ability")
+    private String passiveAbility;
+
+    public RobotPassive getPassive() {
+        if (passiveAbility == null) return null;
+        try {
+            return RobotPassive.valueOf(passiveAbility);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
 }

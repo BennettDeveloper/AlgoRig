@@ -14,4 +14,13 @@ public class ActionResult {
     private int healingDone;
     private int batterySpent;
     private String description;
+
+    @Builder.Default
+    private int scanDuration = 0;
+
+    @Builder.Default
+    private int batteryEqualized = 0;
+
+    @Builder.Default
+    private boolean stalledDueToOverload = false;
 }

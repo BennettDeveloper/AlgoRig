@@ -95,6 +95,64 @@ class ScriptParserTest {
     }
 
     @Test
+    void parsesElseIfChains() {
+        String script = """
+                IF myHP < 20
+                    Patch
+                    Patch
+                    Patch
+                ELSE IF myHP < 50
+                    ArmorPlate
+                    Patch
+                    HardStrike
+                ELSE IF enemyHP < 30
+                    PowerSurge
+                    HardStrike
+                    HardStrike
+                ELSE
+                    HardStrike
+                    HardStrike
+                    PowerSurge
+                END IF
+                """;
+
+        ParsedScript result = parser.parse(script);
+        List<Object> blocks = result.getBlocks();
+
+        assertEquals(1, blocks.size());
+        CodeBlock cb = (CodeBlock) blocks.get(0);
+        assertEquals(BlockType.IF_ELSE, cb.getType());
+        assertEquals("myHP < 20", cb.getCondition());
+
+        // IF branch
+        assertEquals(3, cb.getIfBranch().size());
+        assertEquals(Action.PATCH, ((ActionBlock) cb.getIfBranch().get(0)).getAction());
+
+        // ELSE IF chains
+        assertEquals(2, cb.getElseIfChains().size());
+        CodeBlock.ElseIfChain chain0 = cb.getElseIfChains().get(0);
+        assertEquals("myHP < 50", chain0.getCondition());
+        assertEquals(3, chain0.getChildren().size());
+        assertEquals(Action.ARMOR_PLATE, ((ActionBlock) chain0.getChildren().get(0)).getAction());
+
+        CodeBlock.ElseIfChain chain1 = cb.getElseIfChains().get(1);
+        assertEquals("enemyHP < 30", chain1.getCondition());
+        assertEquals(3, chain1.getChildren().size());
+        assertEquals(Action.POWER_SURGE, ((ActionBlock) chain1.getChildren().get(0)).getAction());
+
+        // ELSE branch
+        assertEquals(3, cb.getElseBranch().size());
+        assertEquals(Action.HARD_STRIKE, ((ActionBlock) cb.getElseBranch().get(0)).getAction());
+    }
+
+    @Test
+    void throwsOnElseIfWithoutIf() {
+        String script = "ELSE IF myHP < 50\n    Patch\n    Patch\n    HardStrike\nEND IF\n";
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> parser.parse(script));
+        assertTrue(ex.getMessage().contains("ELSE IF without matching IF"));
+    }
+
+    @Test
     void throwsOnMissingEndIf() {
         String script = """
                 IF myHP < 50

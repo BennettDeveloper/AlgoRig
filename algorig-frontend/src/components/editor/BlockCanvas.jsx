@@ -1,6 +1,8 @@
-import { Fragment, useState, useEffect } from 'react'
+import { Fragment, useState, useEffect, useCallback } from 'react'
 import { useDroppable, useDraggable } from '@dnd-kit/core'
 import ConditionBuilder from './ConditionBuilder'
+import SetBlockItem from './SetBlockItem'
+import UpdateBlockItem from './UpdateBlockItem'
 import {
   SortableContext,
   useSortable,
@@ -153,11 +155,43 @@ function BranchDropZone({ blockId, branch, children, isOver: isOverProp }) {
   )
 }
 
-function ChildActionBlock({ block, parentId, branch, onDelete }) {
+function ChildBlock({ block, parentId, branch, onDelete, onUpdate, userVars, parentColor }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `child-${block.id}`,
     data: { type: 'child-action', block, parentId, branch },
   })
+
+  const dragHandleProps = { ...attributes, ...listeners }
+
+  if (block.type === 'set') {
+    return (
+      <div ref={setNodeRef} style={{ opacity: isDragging ? 0.3 : 1, marginBottom: 6, transition: 'opacity 0.15s' }}>
+        <SetBlockItem
+          block={block}
+          onDelete={() => onDelete(parentId, branch, block.id)}
+          onUpdate={(_id, patch) => onUpdate(parentId, branch, block.id, patch)}
+          dragHandleProps={dragHandleProps}
+          userVars={userVars}
+          parentColor={parentColor}
+        />
+      </div>
+    )
+  }
+
+  if (block.type === 'update') {
+    return (
+      <div ref={setNodeRef} style={{ opacity: isDragging ? 0.3 : 1, marginBottom: 6, transition: 'opacity 0.15s' }}>
+        <UpdateBlockItem
+          block={block}
+          onDelete={() => onDelete(parentId, branch, block.id)}
+          onUpdate={(_id, patch) => onUpdate(parentId, branch, block.id, patch)}
+          dragHandleProps={dragHandleProps}
+          userVars={userVars}
+          parentColor={parentColor}
+        />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -216,6 +250,40 @@ function InlineActionPicker({ onSelect }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
+  const sectionLabel = (text, color) => (
+    <div style={{
+      padding: '4px 12px 2px',
+      fontSize: 9,
+      fontFamily: 'JetBrains Mono, monospace',
+      fontWeight: 700,
+      letterSpacing: '0.12em',
+      color,
+      opacity: 0.7,
+      textTransform: 'uppercase',
+    }}>
+      {text}
+    </div>
+  )
+
+  const row = (label, color, onClick) => (
+    <div
+      onClick={onClick}
+      style={{
+        padding: '7px 12px',
+        borderRadius: 6,
+        color,
+        fontSize: 12,
+        cursor: 'pointer',
+        fontFamily: 'JetBrains Mono, monospace',
+        transition: 'background 0.1s',
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
+      {label}
+    </div>
+  )
+
   return (
     <div style={{ position: 'relative' }} onMouseDown={e => e.stopPropagation()}>
       <button
@@ -242,7 +310,7 @@ function InlineActionPicker({ onSelect }) {
           e.currentTarget.style.color = '#555577'
         }}
       >
-        + Add action
+        + Add block
       </button>
 
       {open && (
@@ -255,32 +323,31 @@ function InlineActionPicker({ onSelect }) {
           background: '#0f0f1a',
           border: '1px solid rgba(255,255,255,0.12)',
           borderRadius: 10,
-          padding: 6,
+          padding: '6px 0',
           marginTop: 4,
           boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          maxHeight: 280,
+          overflowY: 'auto',
         }}>
+          {sectionLabel('Actions', '#f97316')}
           {ACTION_OPTIONS.map(opt => (
-            <div
-              key={opt.action}
-              onClick={() => {
+            <Fragment key={opt.action}>
+              {row(opt.label, opt.color, () => {
                 onSelect({ id: crypto.randomUUID(), type: 'action', action: opt.action, color: opt.color })
                 setOpen(false)
-              }}
-              style={{
-                padding: '8px 12px',
-                borderRadius: 6,
-                color: opt.color,
-                fontSize: 13,
-                cursor: 'pointer',
-                fontFamily: 'JetBrains Mono, monospace',
-                transition: 'background 0.1s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              {opt.label}
-            </div>
+              })}
+            </Fragment>
           ))}
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 6px' }} />
+          {sectionLabel('Memory', '#22d3ee')}
+          {row('SET variable', '#22d3ee', () => {
+            onSelect({ id: crypto.randomUUID(), type: 'set', variableName: '', expression: '0' })
+            setOpen(false)
+          })}
+          {row('UPDATE variable', '#22d3ee', () => {
+            onSelect({ id: crypto.randomUUID(), type: 'update', variableName: '', operator: '+=', expression: '1' })
+            setOpen(false)
+          })}
         </div>
       )}
     </div>
@@ -321,24 +388,136 @@ function ActionBlockItem({ block, onDelete, dragHandleProps }) {
   )
 }
 
-function IfBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, onDeleteChild }) {
+function RepeatBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, onDeleteChild, onUpdateChild, userVars }) {
+  const amber = '#f59e0b'
+  const amberRgb = '245,158,11'
+  const children = block.children || []
+
+  return (
+    <div style={{
+      background: `rgba(${amberRgb}, 0.06)`,
+      border: `1px solid rgba(${amberRgb}, 0.2)`,
+      borderLeft: `4px solid ${amber}`,
+      borderRadius: 10,
+      padding: '12px 16px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <span
+          style={{ cursor: 'grab', color: '#444466', fontSize: 18, padding: '0 8px', userSelect: 'none' }}
+          {...dragHandleProps}
+        >
+          ⠿
+        </span>
+        <span style={{ color: amber, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 700 }}>
+          REPEAT
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {[2, 3, 4, 5].map(n => (
+            <button
+              key={n}
+              onClick={() => onUpdate(block.id, { count: n })}
+              style={{
+                width: 26, height: 26,
+                borderRadius: 6,
+                border: `1px solid ${block.count === n ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                background: block.count === n ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)',
+                color: block.count === n ? amber : '#555577',
+                fontSize: 12, fontWeight: 700,
+                fontFamily: 'JetBrains Mono, monospace',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              {n}
+            </button>
+          ))}
+          <span style={{ color: `rgba(${amberRgb}, 0.5)`, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, marginLeft: 2 }}>
+            ×
+          </span>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={() => onDelete(block.id)}
+          style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 16, padding: '0 4px', transition: 'color 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#ff4455'}
+          onMouseLeave={e => e.currentTarget.style.color = '#444466'}
+        >✕</button>
+      </div>
+
+      <div style={{ marginLeft: 20, marginBottom: 8 }}>
+        <BranchDropZone
+          blockId={block.id}
+          branch="if"
+          isOver={overBranch?.blockId === block.id && overBranch?.branch === 'if'}
+        >
+          {children.map(child => (
+            <ChildBlock
+              key={child.id}
+              block={child}
+              parentId={block.id}
+              branch="if"
+              onDelete={onDeleteChild}
+              onUpdate={onUpdateChild}
+              userVars={userVars}
+              parentColor={amber}
+            />
+          ))}
+        </BranchDropZone>
+        <div style={{ marginTop: 6 }}>
+          <InlineActionPicker onSelect={newBlock => onUpdate(block.id, { children: [...children, newBlock] })} />
+        </div>
+      </div>
+
+      <div style={{ marginTop: 10, color: `rgba(${amberRgb}, 0.4)`, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+        END REPEAT
+      </div>
+    </div>
+  )
+}
+
+function IfBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, onDeleteChild, onUpdateChild, userVars }) {
   const isIfElse = block.type === 'ifelse'
   const amber = '#f59e0b'
   const amberRgb = '245,158,11'
+  const elseIfChains = block.elseIfChains || []
 
   const addChild = (branch, newBlock) => {
-    if (isIfElse) {
-      if (branch === 'if') {
-        onUpdate(block.id, { ifChildren: [...(block.ifChildren || []), newBlock] })
-      } else {
-        onUpdate(block.id, { elseChildren: [...(block.elseChildren || []), newBlock] })
-      }
+    if (branch.startsWith('elseif-')) {
+      const chainIdx = parseInt(branch.split('-')[1], 10)
+      const chains = [...elseIfChains]
+      chains[chainIdx] = { ...chains[chainIdx], children: [...(chains[chainIdx].children || []), newBlock] }
+      onUpdate(block.id, { elseIfChains: chains })
+    } else if (branch === 'if') {
+      onUpdate(block.id, { ifChildren: [...(block.ifChildren || block.children || []), newBlock] })
     } else {
-      onUpdate(block.id, { children: [...(block.children || []), newBlock] })
+      onUpdate(block.id, { elseChildren: [...(block.elseChildren || []), newBlock] })
     }
   }
 
-  const ifChildren = isIfElse ? (block.ifChildren || []) : (block.children || [])
+  const addElseIfChain = () => {
+    const newChain = { id: crypto.randomUUID(), condition: '', children: [] }
+    if (!isIfElse) {
+      onUpdate(block.id, {
+        type: 'ifelse',
+        ifChildren: block.children || [],
+        elseIfChains: [newChain],
+        elseChildren: [],
+      })
+    } else {
+      onUpdate(block.id, { elseIfChains: [...elseIfChains, newChain] })
+    }
+  }
+
+  const deleteElseIfChain = (chainIdx) => {
+    onUpdate(block.id, { elseIfChains: elseIfChains.filter((_, i) => i !== chainIdx) })
+  }
+
+  const updateChainCondition = (chainIdx, condition) => {
+    const chains = [...elseIfChains]
+    chains[chainIdx] = { ...chains[chainIdx], condition }
+    onUpdate(block.id, { elseIfChains: chains })
+  }
+
+  const ifChildren = block.ifChildren || block.children || []
   const elseChildren = block.elseChildren || []
 
   return (
@@ -362,8 +541,23 @@ function IfBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, o
         <ConditionBuilder
           condition={block.condition || ''}
           onChange={condition => onUpdate(block.id, { condition })}
+          userVars={userVars || []}
         />
         <div style={{ flex: 1 }} />
+        <button
+          onClick={addElseIfChain}
+          title="Add ELSE IF chain"
+          style={{
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+            borderRadius: 6, color: '#f59e0b', cursor: 'pointer', fontSize: 11,
+            fontFamily: 'JetBrains Mono, monospace', fontWeight: 700,
+            padding: '4px 8px', transition: 'all 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.18)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.08)' }}
+        >
+          + ELSE IF
+        </button>
         <button
           onClick={() => onDelete(block.id)}
           style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 16, padding: '0 4px', transition: 'color 0.15s' }}
@@ -379,12 +573,15 @@ function IfBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, o
           isOver={overBranch?.blockId === block.id && overBranch?.branch === 'if'}
         >
           {ifChildren.map(child => (
-            <ChildActionBlock
+            <ChildBlock
               key={child.id}
               block={child}
               parentId={block.id}
               branch="if"
               onDelete={onDeleteChild}
+              onUpdate={onUpdateChild}
+              userVars={userVars}
+              parentColor={amber}
             />
           ))}
         </BranchDropZone>
@@ -392,6 +589,56 @@ function IfBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, o
           <InlineActionPicker onSelect={newBlock => addChild('if', newBlock)} />
         </div>
       </div>
+
+      {elseIfChains.map((chain, chainIdx) => (
+        <Fragment key={chain.id}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            margin: '10px 0', padding: '4px 8px 4px 12px',
+            background: `rgba(${amberRgb}, 0.1)`, border: `1px solid rgba(${amberRgb}, 0.2)`,
+            borderRadius: 6,
+          }}>
+            <span style={{ color: amber, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+              ELSE IF
+            </span>
+            <ConditionBuilder
+              condition={chain.condition || ''}
+              onChange={condition => updateChainCondition(chainIdx, condition)}
+              userVars={userVars || []}
+            />
+            <div style={{ flex: 1 }} />
+            <button
+              onClick={() => deleteElseIfChain(chainIdx)}
+              style={{ background: 'none', border: 'none', color: '#444466', cursor: 'pointer', fontSize: 13, padding: '0 4px', transition: 'color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#ff4455'}
+              onMouseLeave={e => e.currentTarget.style.color = '#444466'}
+            >✕</button>
+          </div>
+          <div style={{ marginLeft: 20, marginBottom: 8 }}>
+            <BranchDropZone
+              blockId={block.id}
+              branch={`elseif-${chainIdx}`}
+              isOver={overBranch?.blockId === block.id && overBranch?.branch === `elseif-${chainIdx}`}
+            >
+              {(chain.children || []).map(child => (
+                <ChildBlock
+                  key={child.id}
+                  block={child}
+                  parentId={block.id}
+                  branch={`elseif-${chainIdx}`}
+                  onDelete={onDeleteChild}
+                  onUpdate={onUpdateChild}
+                  userVars={userVars}
+                  parentColor={amber}
+                />
+              ))}
+            </BranchDropZone>
+            <div style={{ marginTop: 6 }}>
+              <InlineActionPicker onSelect={newBlock => addChild(`elseif-${chainIdx}`, newBlock)} />
+            </div>
+          </div>
+        </Fragment>
+      ))}
 
       {isIfElse && (
         <>
@@ -409,12 +656,15 @@ function IfBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, o
               isOver={overBranch?.blockId === block.id && overBranch?.branch === 'else'}
             >
               {elseChildren.map(child => (
-                <ChildActionBlock
+                <ChildBlock
                   key={child.id}
                   block={child}
                   parentId={block.id}
                   branch="else"
                   onDelete={onDeleteChild}
+                  onUpdate={onUpdateChild}
+                  userVars={userVars}
+                  parentColor={amber}
                 />
               ))}
             </BranchDropZone>
@@ -432,7 +682,7 @@ function IfBlockItem({ block, onDelete, onUpdate, dragHandleProps, overBranch, o
   )
 }
 
-function SortableBlock({ block, onDelete, onUpdate, overBranch, onDeleteChild }) {
+function SortableBlock({ block, onDelete, onUpdate, overBranch, onDeleteChild, onUpdateChild, userVars }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.id })
 
@@ -448,6 +698,21 @@ function SortableBlock({ block, onDelete, onUpdate, overBranch, onDeleteChild })
     <div ref={setNodeRef} style={style}>
       {block.type === 'action' ? (
         <ActionBlockItem block={block} onDelete={onDelete} dragHandleProps={dragHandleProps} />
+      ) : block.type === 'set' ? (
+        <SetBlockItem block={block} onDelete={onDelete} onUpdate={onUpdate} dragHandleProps={dragHandleProps} userVars={userVars} />
+      ) : block.type === 'update' ? (
+        <UpdateBlockItem block={block} onDelete={onDelete} onUpdate={onUpdate} dragHandleProps={dragHandleProps} userVars={userVars} />
+      ) : block.type === 'repeat' ? (
+        <RepeatBlockItem
+          block={block}
+          onDelete={onDelete}
+          onUpdate={onUpdate}
+          dragHandleProps={dragHandleProps}
+          overBranch={overBranch}
+          onDeleteChild={onDeleteChild}
+          onUpdateChild={onUpdateChild}
+          userVars={userVars}
+        />
       ) : (
         <IfBlockItem
           block={block}
@@ -456,15 +721,24 @@ function SortableBlock({ block, onDelete, onUpdate, overBranch, onDeleteChild })
           dragHandleProps={dragHandleProps}
           overBranch={overBranch}
           onDeleteChild={onDeleteChild}
+          onUpdateChild={onUpdateChild}
+          userVars={userVars}
         />
       )}
     </div>
   )
 }
 
-export default function BlockCanvas({ blocks, onChange, overGapIndex, overBranch, onDeleteChild }) {
+export default function BlockCanvas({ blocks, onChange, overGapIndex, overBranch, onDeleteChild, onUpdateChild, userVars: userVarsProp }) {
   const handleDelete = (id) => onChange(blocks.filter(b => b.id !== id))
   const handleUpdate = (id, patch) => onChange(blocks.map(b => b.id === id ? { ...b, ...patch } : b))
+
+  const computedVars = [...new Set(
+    blocks
+      .filter(b => b.type === 'set' && b.variableName && /^[a-zA-Z][a-zA-Z0-9_]*$/.test(b.variableName))
+      .map(b => b.variableName)
+  )]
+  const userVars = userVarsProp ?? computedVars
 
   if (blocks.length === 0) {
     return (
@@ -487,6 +761,8 @@ export default function BlockCanvas({ blocks, onChange, overGapIndex, overBranch
                 onUpdate={handleUpdate}
                 overBranch={overBranch}
                 onDeleteChild={onDeleteChild}
+                onUpdateChild={onUpdateChild}
+                userVars={userVars}
               />
               <GapZone index={i + 1} isOver={overGapIndex === i + 1} />
             </Fragment>

@@ -18,7 +18,7 @@ class BattleEngineTest {
     @BeforeEach
     void setUp() {
         parser = new ScriptParser();
-        engine = new BattleEngine(new ActionExecutor(), new ConditionEvaluator());
+        engine = new BattleEngine(new ActionExecutor(), new ConditionEvaluator(), new NarrativeEngine(), new ExpressionEvaluator(), new PassiveExecutor());
     }
 
     /**
@@ -63,10 +63,10 @@ class BattleEngineTest {
         ParsedScript scriptA = buildScript("HARD_STRIKE");
         ParsedScript scriptB = buildScript("PATCH");
 
-        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB);
+        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB, BattleEngine.DEFAULT_MAX_TURNS);
 
         assertEquals("A", state.getWinnerId());
-        assertTrue(state.getCurrentTurn() <= BattleEngine.MAX_TURNS);
+        assertTrue(state.getCurrentTurn() <= BattleEngine.DEFAULT_MAX_TURNS);
         assertTrue(state.getCurrentTurn() > 0);
     }
 
@@ -83,7 +83,7 @@ class BattleEngineTest {
         ParsedScript scriptA = buildScript("HARD_STRIKE");
         ParsedScript scriptB = buildScript("SYSTEM_SCAN");
 
-        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB);
+        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB, BattleEngine.DEFAULT_MAX_TURNS);
 
         assertNotNull(state.getWinnerId());
         assertEquals("A", state.getWinnerId());
@@ -100,34 +100,34 @@ class BattleEngineTest {
     @Test
     void maxTurnsCapReturnsDrawWhenHpEqual() {
         // Both robots do SYSTEM_SCAN (no damage), start with equal HP
-        // Battery: cost=10, wattage=10 → net zero, never runs out
-        Robot robotA = buildRobot(100, 0, 0, 50, 100, 10, 0, 0, 0);
-        Robot robotB = buildRobot(100, 0, 0,  0, 100, 10, 0, 0, 0);
+        // Battery: wattage=30 keeps them well above drain threshold
+        Robot robotA = buildRobot(100, 0, 0, 50, 100, 30, 0, 0, 0);
+        Robot robotB = buildRobot(100, 0, 0,  0, 100, 30, 0, 0, 0);
 
         ParsedScript scriptA = buildScript("SYSTEM_SCAN");
         ParsedScript scriptB = buildScript("SYSTEM_SCAN");
 
-        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB);
+        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB, BattleEngine.DEFAULT_MAX_TURNS);
 
         assertEquals("DRAW", state.getWinnerId());
-        assertEquals(BattleEngine.MAX_TURNS, state.getCurrentTurn());
+        assertEquals(BattleEngine.DEFAULT_MAX_TURNS, state.getCurrentTurn());
     }
 
     @Test
     void maxTurnsCapReturnsHigherHpWinner() {
         // Both start with 1000 HP. A deals 1 damage/turn; B does SYSTEM_SCAN (no damage).
-        // Battery: cost=15, wattage=15 → net zero, never runs out.
+        // Battery: wattage=30 keeps both above drain threshold for full 200 turns.
         // After 200 turns: A has 1000 HP, B has 800 HP → A wins by HP.
-        Robot robotA = buildRobot(1000, 1, 0, 50, 100, 15, 0, 0, 0);
-        Robot robotB = buildRobot(1000, 0, 0,  0, 100, 10, 0, 0, 0);
+        Robot robotA = buildRobot(1000, 1, 0, 50, 100, 30, 0, 0, 0);
+        Robot robotB = buildRobot(1000, 0, 0,  0, 100, 30, 0, 0, 0);
 
         ParsedScript scriptA = buildScript("HARD_STRIKE");
         ParsedScript scriptB = buildScript("SYSTEM_SCAN");
 
-        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB);
+        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB, BattleEngine.DEFAULT_MAX_TURNS);
 
         assertEquals("A", state.getWinnerId());
-        assertEquals(BattleEngine.MAX_TURNS, state.getCurrentTurn());
+        assertEquals(BattleEngine.DEFAULT_MAX_TURNS, state.getCurrentTurn());
     }
 
     // -------------------------------------------------------------------------
@@ -139,17 +139,17 @@ class BattleEngineTest {
         // Script A has two actions: HARD_STRIKE then PATCH
         // After executing both, on the 3rd execution it should loop to HARD_STRIKE again
         // B does SYSTEM_SCAN so A won't die; B has high HP so A won't kill B quickly
-        Robot robotA = buildRobot(1000, 1, 0, 50, 100, 10, 0, 0, 10);
-        Robot robotB = buildRobot(1000, 0, 0,  0, 100, 10, 0, 0, 0);
+        Robot robotA = buildRobot(1000, 1, 0, 50, 100, 30, 0, 0, 10);
+        Robot robotB = buildRobot(1000, 0, 0,  0, 100, 30, 0, 0, 0);
 
         ParsedScript scriptA = buildScript("HARD_STRIKE\nPATCH");
         ParsedScript scriptB = buildScript("SYSTEM_SCAN");
 
-        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB);
+        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB, BattleEngine.DEFAULT_MAX_TURNS);
 
-        // Extract the log entries where actor = "A"
+        // Extract the ACTION log entries where actor = "A" (exclude BATTERY_DRAIN etc.)
         List<BattleLogEntry> aEntries = state.getLog().stream()
-                .filter(e -> "A".equals(e.getActor()))
+                .filter(e -> "A".equals(e.getActor()) && "ACTION".equals(e.getEntryType()))
                 .toList();
 
         assertTrue(aEntries.size() >= 3, "Expected at least 3 turns of A acting");
@@ -164,17 +164,19 @@ class BattleEngineTest {
 
     @Test
     void cpuStallOccursWhenBatteryDepleted() {
-        // A: battery=20, wattage=0 (no regen), clockSpeed=50
+        // A: battery=35, wattage=0 (no regen), clockSpeed=50
         // HARD_STRIKE cost = max(5, 20 - 50/10) = 15
-        // Turn 1: battery 20 → 20-15+0=5. Turn 2: 5 < 15 → CPU_STALL
+        // Passive drain on robot with battery=35: max(1, 10 - 35/15) = max(1,8) = 8
+        // Turn 1: action cost 15 → battery 20; drain 8 → battery 12
+        // Turn 2: 12 < 15 → CPU_STALL (battery after stall action stays 12; drain 9 → 3; still alive)
         // B has very low damage so A survives long enough to stall
-        Robot robotA = buildRobot(1000, 1, 0, 50, 20, 0, 0, 0, 0);
-        Robot robotB = buildRobot(1000, 0, 0,  0, 100, 5, 0, 0, 0);
+        Robot robotA = buildRobot(1000, 1, 0, 50, 35, 0, 0, 0, 0);
+        Robot robotB = buildRobot(1000, 0, 0,  0, 100, 30, 0, 0, 0);
 
         ParsedScript scriptA = buildScript("HARD_STRIKE");
         ParsedScript scriptB = buildScript("SYSTEM_SCAN");
 
-        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB);
+        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB, BattleEngine.DEFAULT_MAX_TURNS);
 
         // Find the first stall entry for A
         BattleLogEntry stallEntry = state.getLog().stream()
@@ -200,7 +202,7 @@ class BattleEngineTest {
         ParsedScript scriptA = buildScript("SYSTEM_SCAN");
         ParsedScript scriptB = buildScript("SYSTEM_SCAN");
 
-        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB);
+        BattleState state = engine.simulate(robotA, scriptA, robotB, scriptB, BattleEngine.DEFAULT_MAX_TURNS);
 
         List<BattleLogEntry> log = state.getLog();
         assertTrue(log.size() >= 4, "Expected at least 2 full rounds");
