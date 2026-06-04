@@ -2,7 +2,9 @@ import { useState, useEffect, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { startBattle } from '../api/battles'
+import { getScripts } from '../api/scripts'
 import RobotCard from '../components/robots/RobotCard'
+import ErrorModal from '../components/ErrorModal'
 
 const tierColors = {
   1: '#6b7280',
@@ -69,97 +71,6 @@ function StepIndicator({ current }) {
   )
 }
 
-function ScriptColumn({ robot, scripts, selectedScript, onScriptChange, dimmed }) {
-  const tierColor = tierColors[robot?.tier] || '#6b7280'
-  const spec = getSpecialization(robot)
-  const lines = (selectedScript?.content || '').split('\n')
-  const preview = lines.slice(0, 8).join('\n') + (lines.length > 8 ? '\n...' : '')
-
-  return (
-    <div style={{ opacity: dimmed ? 0.4 : 1, transition: 'opacity 0.2s ease', pointerEvents: dimmed ? 'none' : 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 20 }}>🤖</span>
-        <span style={{ fontSize: 15, fontWeight: 700, color: '#f0f0ff' }}>{robot?.name}</span>
-        {robot && (
-          <span style={{
-            background: `${tierColor}20`, border: `1px solid ${tierColor}50`,
-            borderRadius: 4, padding: '2px 7px', color: tierColor,
-            fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, letterSpacing: '0.08em',
-          }}>
-            TIER {robot.tier}
-          </span>
-        )}
-        {spec && (
-          <span style={{
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 4, padding: '2px 7px', color: '#8888aa',
-            fontSize: 10, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.06em',
-          }}>
-            {spec}
-          </span>
-        )}
-      </div>
-
-      <select
-        value={selectedScript?.id ?? ''}
-        onChange={e => {
-          const found = scripts.find(s => s.id === Number(e.target.value))
-          onScriptChange(found || null)
-        }}
-        style={{
-          width: '100%',
-          background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 8, padding: '10px 14px',
-          color: selectedScript ? '#f0f0ff' : '#555577',
-          fontSize: 13, fontFamily: 'inherit', outline: 'none', cursor: 'pointer', marginBottom: 12,
-        }}
-      >
-        <option value="" disabled style={{ background: '#0f0f1a' }}>-- Select a script --</option>
-        {scripts.map(s => (
-          <option key={s.id} value={s.id} style={{ background: '#0f0f1a' }}>{s.name}</option>
-        ))}
-      </select>
-
-      {selectedScript ? (
-        <pre style={{
-          background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 8, padding: '12px 14px',
-          fontFamily: 'JetBrains Mono, monospace', fontSize: 12,
-          color: '#8888aa', lineHeight: 1.6, overflow: 'hidden',
-          maxHeight: 140, whiteSpace: 'pre-wrap', margin: 0,
-        }}>
-          {preview}
-        </pre>
-      ) : (
-        <div style={{
-          height: 80, borderRadius: 8,
-          border: '1px solid rgba(255,255,255,0.04)',
-          background: 'rgba(0,0,0,0.2)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#333355', fontSize: 12, fontFamily: 'JetBrains Mono, monospace',
-        }}>
-          No script selected
-        </div>
-      )}
-
-      <a
-        href="/scripts/new"
-        target="_blank"
-        rel="noreferrer"
-        style={{
-          display: 'inline-block', marginTop: 10,
-          fontSize: 12, color: '#f97316', textDecoration: 'none',
-          fontFamily: 'JetBrains Mono, monospace',
-        }}
-        onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-        onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-      >
-        + Create New Script
-      </a>
-    </div>
-  )
-}
-
 export default function BattleLauncher() {
   const navigate = useNavigate()
 
@@ -181,13 +92,28 @@ export default function BattleLauncher() {
   const [pickingSlot, setPickingSlot] = useState(null)
   const [robotSearch, setRobotSearch] = useState('')
 
+  const [challengeScript, setChallengeScript] = useState(null)
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('challenge_script')
+    if (stored) {
+      sessionStorage.removeItem('challenge_script')
+      try {
+        setChallengeScript(JSON.parse(stored))
+        setSameScript(false)
+      } catch (e) {
+        console.error('Failed to parse challenge script', e)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     Promise.all([
       client.get('/robots'),
-      client.get('/scripts'),
-    ]).then(([robotsRes, scriptsRes]) => {
+      getScripts(),
+    ]).then(([robotsRes, scriptsData]) => {
       setRobots(robotsRes.data)
-      setScripts(scriptsRes.data)
+      setScripts(scriptsData)
     }).finally(() => setLoading(false))
   }, [])
 
@@ -219,21 +145,24 @@ export default function BattleLauncher() {
         robotAId: robotA.id,
         robotBId: robotB.id,
         scriptAId: scriptA.id,
-        scriptBId: sameScript ? scriptA.id : scriptB.id,
+        scriptBId: sameScript ? scriptA.id : (challengeScript ? challengeScript.id : scriptB?.id),
         tierCap,
         maxTurns,
       }
       const res = await startBattle(payload)
-      navigate(`/battles/${res.data.id}`)
+      navigate(`/battles/${res.id}`)
     } catch (err) {
-      setError(err.response?.data?.message || 'Battle failed to launch. Check your scripts and try again.')
+      const msg = err.response?.data?.message
+        || err.message
+        || 'Battle failed to launch. Check your scripts and try again.'
+      setError(msg)
     } finally {
       setLaunching(false)
     }
   }
 
   const canProceedStep1 = Boolean(robotA && robotB)
-  const canProceedStep2 = Boolean(scriptA && (sameScript || scriptB))
+  const canProceedStep2 = Boolean(scriptA && (sameScript || scriptB || challengeScript))
 
   const backBtnStyle = {
     padding: '10px 20px', borderRadius: 8, fontSize: 13, fontFamily: 'inherit',
@@ -331,8 +260,155 @@ export default function BattleLauncher() {
     )
   }
 
+  function renderScriptSlot(slot) {
+    const isA       = slot === 'A'
+    const robot     = isA ? robotA : robotB
+    const dimmed    = !isA && sameScript
+    const selected  = isA ? scriptA : (sameScript ? scriptA : scriptB)
+    const onSelect  = isA ? setScriptA : (sameScript ? () => {} : setScriptB)
+    const tierColor = tierColors[robot?.tier] || '#6b7280'
+    const spec      = getSpecialization(robot)
+    const lines     = (selected?.content || '').split('\n')
+    const preview   = lines.slice(0, 8).join('\n') + (lines.length > 8 ? '\n...' : '')
+
+    return (
+      <div style={{ opacity: dimmed ? 0.4 : 1, transition: 'opacity 0.2s ease', pointerEvents: dimmed ? 'none' : 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 20 }}>🤖</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#f0f0ff' }}>{robot?.name}</span>
+          {robot && (
+            <span style={{
+              background: `${tierColor}20`, border: `1px solid ${tierColor}50`,
+              borderRadius: 4, padding: '2px 7px', color: tierColor,
+              fontSize: 10, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, letterSpacing: '0.08em',
+            }}>
+              TIER {robot.tier}
+            </span>
+          )}
+          {spec && (
+            <span style={{
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 4, padding: '2px 7px', color: '#8888aa',
+              fontSize: 10, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.06em',
+            }}>
+              {spec}
+            </span>
+          )}
+        </div>
+
+        {!isA && !sameScript && challengeScript ? (
+          // Challenge script display for slot B
+          <div style={{
+            background: 'rgba(249,115,22,0.06)',
+            border: '1px solid rgba(249,115,22,0.25)',
+            borderRadius: 8, padding: '14px 16px',
+          }}>
+            <div style={{
+              fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
+              letterSpacing: '0.08em', color: '#f97316', marginBottom: 8,
+            }}>
+              ⚔️ Challenging:
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f0ff', marginBottom: 2 }}>
+              "{challengeScript.name}"
+            </div>
+            <div style={{ fontSize: 12, color: '#8888aa', marginBottom: 10 }}>
+              by @{challengeScript.ownerUsername}
+            </div>
+            <pre style={{
+              background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 8, padding: '10px 12px', margin: '0 0 12px',
+              fontFamily: 'JetBrains Mono, monospace', fontSize: 11,
+              color: '#8888aa', lineHeight: 1.6, overflow: 'hidden',
+              maxHeight: 80, whiteSpace: 'pre-wrap',
+            }}>
+              {(challengeScript.content || '').split('\n').slice(0, 4).join('\n')}
+              {(challengeScript.content || '').split('\n').length > 4 ? '\n...' : ''}
+            </pre>
+            <button
+              onClick={() => setChallengeScript(null)}
+              style={{
+                background: 'none', border: 'none', padding: 0,
+                color: '#555577', fontSize: 12, cursor: 'pointer',
+                fontFamily: 'JetBrains Mono, monospace', textDecoration: 'underline',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = '#f0f0ff'}
+              onMouseLeave={e => e.currentTarget.style.color = '#555577'}
+            >
+              × Use my own script instead
+            </button>
+          </div>
+        ) : (
+          <>
+            <select
+              value={selected?.id ?? ''}
+              onChange={e => onSelect(scripts.find(s => s.id === Number(e.target.value)) || null)}
+              style={{
+                width: '100%',
+                background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, padding: '10px 14px',
+                color: selected ? '#f0f0ff' : '#555577',
+                fontSize: 13, fontFamily: 'inherit', outline: 'none', cursor: 'pointer', marginBottom: 12,
+              }}
+            >
+              <option value="" disabled style={{ background: '#0f0f1a' }}>-- Select a script --</option>
+              {scripts.map(s => (
+                <option key={s.id} value={s.id} style={{ background: '#0f0f1a' }}>{s.name}</option>
+              ))}
+            </select>
+
+            {selected ? (
+              <pre style={{
+                background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 8, padding: '12px 14px',
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 12,
+                color: '#8888aa', lineHeight: 1.6, overflow: 'hidden',
+                maxHeight: 140, whiteSpace: 'pre-wrap', margin: 0,
+              }}>
+                {preview}
+              </pre>
+            ) : (
+              <div style={{
+                height: 80, borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.04)',
+                background: 'rgba(0,0,0,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#333355', fontSize: 12, fontFamily: 'JetBrains Mono, monospace',
+              }}>
+                No script selected
+              </div>
+            )}
+
+            <a
+              href="/scripts/new"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-block', marginTop: 10,
+                fontSize: 12, color: '#f97316', textDecoration: 'none',
+                fontFamily: 'JetBrains Mono, monospace',
+              }}
+              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+            >
+              + Create New Script
+            </a>
+          </>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '32px 40px', maxWidth: 920, margin: '0 auto' }}>
+      {error && (
+        <ErrorModal
+          message={error}
+          onClose={() => setError(null)}
+          onRetry={() => handleLaunch()}
+        />
+      )}
+
       <StepIndicator current={step} />
 
       {/* ── STEP 1: PICK ROBOTS ────────────────────────────────────────── */}
@@ -455,6 +531,17 @@ export default function BattleLauncher() {
                 </button>
               </div>
 
+              {pickingSlot === 'B' && challengeScript?.requiredRobotIds?.length > 0 && (
+                <div style={{
+                  background: 'rgba(249,115,22,0.06)',
+                  border: '1px solid rgba(249,115,22,0.3)',
+                  borderRadius: 6, padding: '8px 12px',
+                  marginBottom: 12, fontSize: 12, color: '#f97316',
+                }}>
+                  ⚙️ This script has robot requirements. Only compatible robots are selectable.
+                </div>
+              )}
+
               {pickerRobots.length === 0 ? (
                 <div style={{
                   textAlign: 'center', padding: '32px 0',
@@ -469,9 +556,16 @@ export default function BattleLauncher() {
                 }}>
                   {pickerRobots.map(robot => {
                     const isOther = (pickingSlot === 'A' ? robotB : robotA)?.id === robot.id
+                    const reqIds = pickingSlot === 'B' ? challengeScript?.requiredRobotIds : null
+                    const reqBlocked = reqIds?.length > 0 && !reqIds.map(Number).includes(Number(robot.id))
                     return (
                       <div key={robot.id} style={{ opacity: isOther ? 0.25 : 1, pointerEvents: isOther ? 'none' : 'auto' }}>
-                        <RobotCard robot={robot} onClick={() => selectRobot(robot)} />
+                        <RobotCard
+                          robot={robot}
+                          onClick={() => selectRobot(robot)}
+                          disabled={reqBlocked}
+                          disabledReason={reqBlocked ? 'This script requires specific robots' : null}
+                        />
                       </div>
                     )
                   })}
@@ -548,20 +642,8 @@ export default function BattleLauncher() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 36 }}>
-                <ScriptColumn
-                  robot={robotA}
-                  scripts={scripts}
-                  selectedScript={scriptA}
-                  onScriptChange={setScriptA}
-                  dimmed={false}
-                />
-                <ScriptColumn
-                  robot={robotB}
-                  scripts={scripts}
-                  selectedScript={sameScript ? scriptA : scriptB}
-                  onScriptChange={sameScript ? () => {} : setScriptB}
-                  dimmed={sameScript}
-                />
+                {renderScriptSlot('A')}
+                {renderScriptSlot('B')}
               </div>
             </>
           )}
@@ -677,8 +759,17 @@ export default function BattleLauncher() {
                   color: sameScript ? '#555577' : '#f0f0ff',
                   fontStyle: sameScript ? 'italic' : 'normal',
                 }}>
-                  {sameScript ? `Same as A — ${scriptA?.name}` : (scriptB?.name || '—')}
+                  {sameScript
+                    ? `Same as A — ${scriptA?.name}`
+                    : challengeScript
+                      ? challengeScript.name
+                      : (scriptB?.name || '—')}
                 </div>
+                {challengeScript && !sameScript && (
+                  <div style={{ fontSize: 11, color: '#f97316', marginTop: 5, fontFamily: 'JetBrains Mono, monospace' }}>
+                    ⚔️ Challenging public script from @{challengeScript.ownerUsername}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -724,16 +815,6 @@ export default function BattleLauncher() {
               '⚔️  LAUNCH BATTLE'
             )}
           </button>
-
-          {error && (
-            <div style={{
-              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-              borderRadius: 10, padding: '14px 18px', marginBottom: 16,
-              color: '#fca5a5', fontSize: 13, lineHeight: 1.5,
-            }}>
-              ⚠️ {error}
-            </div>
-          )}
 
           <button
             onClick={() => { setStep(2); setError(null) }}

@@ -5,8 +5,11 @@ export default function useReplayEngine(log) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [countdown, setCountdown] = useState(null)
   const [countdownActive, setCountdownActive] = useState(false)
+  const [battleEnded, setBattleEnded] = useState(false)
+  const [speed, setSpeed] = useState(1)
   const intervalRef = useRef(null)
   const countdownRef = useRef(null)
+  const endTimerRef = useRef(null)
 
   const totalEvents = log.length
 
@@ -49,9 +52,9 @@ export default function useReplayEngine(log) {
         }
         return prev + 1
       })
-    }, 1200)
+    }, Math.round(1200 / speed))
     return () => clearInterval(intervalRef.current)
-  }, [isPlaying, totalEvents])
+  }, [isPlaying, totalEvents, speed])
 
   const play = useCallback(() => {
     if (currentIndex >= totalEvents - 1) setCurrentIndex(-1)
@@ -74,6 +77,24 @@ export default function useReplayEngine(log) {
     setIsPlaying(false)
     setCurrentIndex(Math.max(-1, Math.min(index, totalEvents - 1)))
   }, [totalEvents])
+
+  const rewatch = useCallback(() => {
+    setBattleEnded(false)
+    setIsPlaying(false)
+    setCurrentIndex(0)
+  }, [])
+
+  // Show victory screen 2.5s after reaching the last entry
+  useEffect(() => {
+    if (currentIndex === totalEvents - 1 && totalEvents > 0) {
+      setIsPlaying(false)
+      endTimerRef.current = setTimeout(() => setBattleEnded(true), 2500)
+    } else {
+      clearTimeout(endTimerRef.current)
+      setBattleEnded(false)
+    }
+    return () => clearTimeout(endTimerRef.current)
+  }, [currentIndex, totalEvents])
 
   // Reconstruct HP and battery state at a given log index
   const getHpState = useCallback((upToIndex) => {
@@ -114,11 +135,15 @@ export default function useReplayEngine(log) {
     totalEvents,
     isPlaying,
     countdown,
+    battleEnded,
+    speed,
+    setSpeed,
     play,
     pause,
     stepForward,
     stepBack,
     seek,
+    rewatch,
     getHpState,
   }
 }

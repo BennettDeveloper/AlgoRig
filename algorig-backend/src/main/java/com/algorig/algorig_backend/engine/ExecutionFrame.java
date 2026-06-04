@@ -21,4 +21,10 @@ public class ExecutionFrame {
     private Deque<int[]> branchStack;
 
     private boolean inBranch;
+
+    @Builder.Default
+    private RobotMemory memory = new RobotMemory();
+
+    @Builder.Default
+    private PassiveState passiveState = new PassiveState();
 }

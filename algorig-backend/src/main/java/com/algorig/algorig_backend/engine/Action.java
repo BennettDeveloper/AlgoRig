@@ -9,5 +9,7 @@ public enum Action {
     ARMOR_PLATE,
     VIRUS_UPLOAD,
     SYSTEM_SCAN,
+    BATTERY_EQUALIZATION,
+    STACK_OVERFLOW,
     CPU_STALL
 }

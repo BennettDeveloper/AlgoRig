@@ -6,21 +6,32 @@ export function TooltipProvider({ children }) {
   const [tooltip, setTooltip] = useState(null)
   const timerRef = useRef(null)
 
-  const showTooltip = useCallback((e, content) => {
+  const showTooltip = useCallback((e, content, placement) => {
+    const resolvedPlacement = placement ?? (e.clientY > window.innerHeight * 0.66 ? 'above' : 'below')
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
-      setTooltip({ x: e.clientX + 16, y: e.clientY + 8, content })
+      setTooltip({ x: e.clientX + 16, y: e.clientY, content, placement: resolvedPlacement })
     }, 400)
   }, [])
 
   const moveTooltip = useCallback((e) => {
-    setTooltip(prev => prev ? { ...prev, x: e.clientX + 16, y: e.clientY + 8 } : null)
+    setTooltip(prev => {
+      if (!prev) return null
+      const placement = e.clientY > window.innerHeight * 0.66 ? 'above' : 'below'
+      return { ...prev, x: e.clientX + 16, y: e.clientY, placement }
+    })
   }, [])
 
   const hideTooltip = useCallback(() => {
     clearTimeout(timerRef.current)
     setTooltip(null)
   }, [])
+
+  const positionStyle = tooltip
+    ? tooltip.placement === 'above'
+      ? { left: tooltip.x, bottom: window.innerHeight - tooltip.y + 10 }
+      : { left: tooltip.x, top: tooltip.y + 8 }
+    : {}
 
   return (
     <TooltipContext.Provider value={{ showTooltip, moveTooltip, hideTooltip }}>
@@ -29,8 +40,7 @@ export function TooltipProvider({ children }) {
         <div
           style={{
             position: 'fixed',
-            left: tooltip.x,
-            top: tooltip.y,
+            ...positionStyle,
             zIndex: 9999,
             pointerEvents: 'none',
             maxWidth: 280,

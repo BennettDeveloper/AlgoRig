@@ -1,6 +1,7 @@
 package com.algorig.algorig_backend.service;
 
 import com.algorig.algorig_backend.dto.RobotDto;
+import com.algorig.algorig_backend.engine.RobotPassive;
 import com.algorig.algorig_backend.model.entity.Robot;
 import com.algorig.algorig_backend.repository.RobotRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class RobotService {
     }
 
     private RobotDto toDto(Robot robot) {
+        RobotPassive passive = RobotPassive.byRobotName(robot.getName());
         return RobotDto.builder()
                 .id(robot.getId())
                 .name(robot.getName())
@@ -48,6 +50,9 @@ public class RobotService {
                 .memory(robot.getMemory())
                 .stability(robot.getStability())
                 .recovery(robot.getRecovery())
+                .passiveAbility(passive != null ? passive.name() : null)
+                .passiveDisplayName(passive != null ? passive.getDisplayName() : null)
+                .passiveDescription(passive != null ? passive.getDescription() : null)
                 .build();
     }
 }

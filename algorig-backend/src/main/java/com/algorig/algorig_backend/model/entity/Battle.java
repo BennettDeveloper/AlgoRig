@@ -19,8 +19,22 @@ public class Battle {
 
     private Long robotAId;
     private Long robotBId;
-    private Long scriptAId;
-    private Long scriptBId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "script_a_id")
+    @ToString.Exclude
+    private Script scriptA;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "script_b_id")
+    @ToString.Exclude
+    private Script scriptB;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = true)
+    @ToString.Exclude
+    private User owner;
+
     private String winnerId;
     private int totalTurns;
 
@@ -32,5 +46,10 @@ public class Battle {
     @PrePersist
     protected void onCreate() {
         this.foughtAt = LocalDateTime.now();
+    }
+
+    public boolean isPublic() {
+        if (scriptA == null || scriptB == null) return false;
+        return scriptA.isPublic() && scriptB.isPublic();
     }
 }

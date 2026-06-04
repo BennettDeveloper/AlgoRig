@@ -5,11 +5,15 @@ import com.algorig.algorig_backend.parser.ActionBlock;
 import com.algorig.algorig_backend.parser.CodeBlock;
 import com.algorig.algorig_backend.parser.ParsedScript;
 import com.algorig.algorig_backend.parser.ScriptParser;
+import com.algorig.algorig_backend.parser.SetBlock;
+import com.algorig.algorig_backend.parser.UpdateBlock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -43,6 +47,9 @@ public class ScriptValidator {
 
         validateBranches(parsed.getBlocks(), errors);
 
+        Set<String> initializedVars = collectAllSetVarNames(parsed.getBlocks());
+        validateUpdateBlocks(parsed.getBlocks(), initializedVars, errors);
+
         return ScriptValidationResultDto.builder()
                 .valid(errors.isEmpty())
                 .errors(errors)
@@ -56,8 +63,10 @@ public class ScriptValidator {
                 count++;
             } else if (block instanceof CodeBlock cb) {
                 count += countActions(cb.getIfBranch());
+                for (var chain : cb.getElseIfChains()) count += countActions(chain.getChildren());
                 count += countActions(cb.getElseBranch());
             }
+            // SetBlock and UpdateBlock are memory operations — they do not consume a turn and are not counted as actions
         }
         return count;
     }
@@ -68,6 +77,7 @@ public class ScriptValidator {
             if (block instanceof CodeBlock cb) {
                 count++;
                 count += countIfBlocks(cb.getIfBranch());
+                for (var chain : cb.getElseIfChains()) count += countIfBlocks(chain.getChildren());
                 count += countIfBlocks(cb.getElseBranch());
             }
         }
@@ -81,7 +91,51 @@ public class ScriptValidator {
                     errors.add("IF block at condition '" + cb.getCondition() + "' has an empty branch");
                 }
                 validateBranches(cb.getIfBranch(), errors);
+                for (var chain : cb.getElseIfChains()) {
+                    if (chain.getChildren().isEmpty()) {
+                        errors.add("ELSE IF block at condition '" + chain.getCondition() + "' has an empty branch");
+                    }
+                    validateBranches(chain.getChildren(), errors);
+                }
                 validateBranches(cb.getElseBranch(), errors);
+            }
+            if (block instanceof SetBlock sb) {
+                if (sb.getExpression() == null || sb.getExpression().isBlank()) {
+                    errors.add("SET " + sb.getVariableName() + " has no value expression");
+                }
+            }
+        }
+    }
+
+    private Set<String> collectAllSetVarNames(List<Object> blocks) {
+        Set<String> vars = new LinkedHashSet<>();
+        for (Object block : blocks) {
+            if (block instanceof SetBlock sb
+                    && sb.getVariableName() != null
+                    && !sb.getVariableName().isEmpty()) {
+                vars.add(sb.getVariableName());
+            } else if (block instanceof CodeBlock cb) {
+                vars.addAll(collectAllSetVarNames(cb.getIfBranch()));
+                for (var chain : cb.getElseIfChains()) vars.addAll(collectAllSetVarNames(chain.getChildren()));
+                vars.addAll(collectAllSetVarNames(cb.getElseBranch()));
+            }
+        }
+        return vars;
+    }
+
+    private void validateUpdateBlocks(List<Object> blocks, Set<String> initializedVars, List<String> errors) {
+        for (Object block : blocks) {
+            if (block instanceof UpdateBlock ub) {
+                if (ub.getVariableName() == null || ub.getVariableName().isEmpty()) {
+                    errors.add("UPDATE block is missing a variable name");
+                } else if (!initializedVars.contains(ub.getVariableName())) {
+                    errors.add("Variable '" + ub.getVariableName() + "' has not been initialized. "
+                        + "Add 'SET " + ub.getVariableName() + " = 0' before using UPDATE.");
+                }
+            } else if (block instanceof CodeBlock cb) {
+                validateUpdateBlocks(cb.getIfBranch(), initializedVars, errors);
+                for (var chain : cb.getElseIfChains()) validateUpdateBlocks(chain.getChildren(), initializedVars, errors);
+                validateUpdateBlocks(cb.getElseBranch(), initializedVars, errors);
             }
         }
     }

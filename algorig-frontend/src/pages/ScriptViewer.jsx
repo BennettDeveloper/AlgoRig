@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import client from '../api/client'
+import { getScripts, deleteScript } from '../api/scripts'
+import { pinScript, unpinScript } from '../api/users'
+import { useToast } from '../context/ToastContext'
 
 const ITEMS_PER_PAGE = 8
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
-function ScriptCard({ script, isSelected, onSelect, onDelete }) {
+function ScriptCard({ script, isSelected, onSelect, onDelete, onPin, onUnpin, pinningId }) {
+  const [pendingOrder, setPendingOrder] = useState(1)
+  const isPinned  = script.featuredOrder != null
+  const isPinning = pinningId === script.id
   const date = new Date(script.updatedAt).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   })
@@ -51,7 +56,7 @@ function ScriptCard({ script, isSelected, onSelect, onDelete }) {
           }}>
             {script.name}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{
               fontSize: 10,
               fontFamily: 'JetBrains Mono, monospace',
@@ -63,7 +68,91 @@ function ScriptCard({ script, isSelected, onSelect, onDelete }) {
             }}>
               v{script.version}
             </span>
+            <span style={{
+              fontSize: 10,
+              fontFamily: 'JetBrains Mono, monospace',
+              color: script.isPublic ? '#22c55e' : '#555577',
+              background: script.isPublic ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${script.isPublic ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`,
+              borderRadius: 4,
+              padding: '2px 6px',
+            }}>
+              {script.isPublic ? 'Public' : 'Private'}
+            </span>
+            {isPinned && (
+              <span style={{
+                fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+                color: '#f97316', background: 'rgba(249,115,22,0.1)',
+                border: '1px solid rgba(249,115,22,0.25)', borderRadius: 4, padding: '2px 6px',
+              }}>
+                📌 #{script.featuredOrder}
+              </span>
+            )}
             <span style={{ fontSize: 11, color: '#444466' }}>{date}</span>
+          </div>
+
+          {/* Pin / Unpin controls */}
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
+            {isPinned ? (
+              <button
+                onClick={() => onUnpin(script.id)}
+                disabled={isPinning}
+                style={{
+                  fontSize: 10, padding: '3px 9px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 4, color: '#555577',
+                  cursor: isPinning ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#ff6b6b'; e.currentTarget.style.borderColor = 'rgba(255,68,68,0.3)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#555577'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+              >
+                {isPinning ? '…' : 'Unpin'}
+              </button>
+            ) : script.isPublic ? (
+              <>
+                <select
+                  value={pendingOrder}
+                  onChange={e => setPendingOrder(Number(e.target.value))}
+                  style={{
+                    fontSize: 10, padding: '3px 6px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 4, color: '#8888aa',
+                    cursor: 'pointer', outline: 'none',
+                    fontFamily: 'JetBrains Mono, monospace',
+                  }}
+                >
+                  <option value={1}>#1</option>
+                  <option value={2}>#2</option>
+                  <option value={3}>#3</option>
+                </select>
+                <button
+                  onClick={() => onPin(script.id, pendingOrder)}
+                  disabled={isPinning}
+                  style={{
+                    fontSize: 10, padding: '3px 9px',
+                    background: 'rgba(249,115,22,0.08)',
+                    border: '1px solid rgba(249,115,22,0.2)',
+                    borderRadius: 4, color: '#f97316',
+                    cursor: isPinning ? 'not-allowed' : 'pointer',
+                    fontFamily: 'inherit', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(249,115,22,0.16)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(249,115,22,0.08)'}
+                >
+                  {isPinning ? '…' : '📌 Pin'}
+                </button>
+              </>
+            ) : (
+              <span
+                title="Make script public to pin it"
+                style={{ fontSize: 10, color: '#333355', cursor: 'help', fontFamily: 'JetBrains Mono, monospace' }}
+              >
+                🔒 Private — cannot pin
+              </span>
+            )}
           </div>
         </div>
         <button
@@ -129,7 +218,7 @@ function ScriptPreview({ script, onEdit }) {
           <div style={{ fontSize: 22, fontWeight: 700, color: '#f0f0ff', marginBottom: 6 }}>
             {script.name}
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{
               fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
               color: '#f97316', background: 'rgba(249,115,22,0.1)',
@@ -138,6 +227,16 @@ function ScriptPreview({ script, onEdit }) {
               v{script.version}
             </span>
             <span style={{ fontSize: 12, color: '#444466' }}>Last updated {date}</span>
+            {script.hasRequirements && (
+              <span style={{
+                fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+                color: '#f97316', background: 'rgba(249,115,22,0.08)',
+                border: '1px solid rgba(249,115,22,0.25)',
+                borderRadius: 4, padding: '2px 8px',
+              }}>
+                ⚙️ {script.requiredRobotIds?.length ?? 0} robot{(script.requiredRobotIds?.length ?? 0) !== 1 ? 's' : ''} required
+              </span>
+            )}
           </div>
         </div>
         <button
@@ -200,11 +299,33 @@ function ScriptPreview({ script, onEdit }) {
               {lines.map((line, i) => {
                 const trimmed = line.trim()
                 let color = '#e0e0ff'
-                if (trimmed.startsWith('IF') || trimmed === 'ELSE' || trimmed === 'END IF') {
+                if (trimmed === 'ELSE' || trimmed === 'END IF') {
                   color = '#f59e0b'
+                } else if (trimmed.startsWith('REPEAT ') || trimmed === 'END REPEAT') {
+                  color = '#22d3ee'
                 } else if (ACTION_NAMES.has(trimmed)) {
                   color = '#f97316'
                 }
+
+                if (trimmed.startsWith('IF ') || trimmed === 'IF') {
+                  const parts = line.split(/\b(AND|OR|NOT)\b/)
+                  return (
+                    <div key={i}>
+                      {parts.map((part, pi) => (
+                        <span key={pi} style={{
+                          color: ['AND', 'OR', 'NOT'].includes(part)
+                            ? '#f97316'
+                            : part.trim().startsWith('IF') || part.trim() === 'ELSE' || part.trim() === 'END IF'
+                            ? '#f59e0b'
+                            : '#c084fc',
+                        }}>
+                          {part}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                }
+
                 return <div key={i} style={{ color }}>{line || ' '}</div>
               })}
             </div>
@@ -297,6 +418,7 @@ function DeleteConfirmModal({ script, onConfirm, onCancel, deleting }) {
 
 export default function ScriptViewer() {
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [scripts, setScripts] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedScript, setSelectedScript] = useState(null)
@@ -304,26 +426,57 @@ export default function ScriptViewer() {
   const [page, setPage] = useState(1)
   const [deleteCandidate, setDeleteCandidate] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [pinningId, setPinningId] = useState(null)
 
   useEffect(() => { fetchScripts() }, [])
   useEffect(() => { setPage(1) }, [search])
 
   function fetchScripts() {
     setLoading(true)
-    client.get('/scripts')
-      .then(res => {
-        setScripts(res.data)
-        if (res.data.length > 0) {
-          setSelectedScript(prev => prev ?? res.data[0])
+    getScripts()
+      .then(data => {
+        setScripts(data)
+        if (data.length > 0) {
+          setSelectedScript(prev => prev ?? data[0])
         }
       })
       .finally(() => setLoading(false))
   }
 
+  async function handlePin(scriptId, order) {
+    setPinningId(scriptId)
+    try {
+      const result = await pinScript(scriptId, order)
+      setScripts(prev => prev.map(s =>
+        s.id === result.id ? { ...s, featuredOrder: result.featuredOrder } : s
+      ))
+    } catch (err) {
+      showToast('error', 'Pin failed',
+        err?.response?.data?.message || 'Could not pin script')
+    } finally {
+      setPinningId(null)
+    }
+  }
+
+  async function handleUnpin(scriptId) {
+    setPinningId(scriptId)
+    try {
+      await unpinScript(scriptId)
+      setScripts(prev => prev.map(s =>
+        s.id === scriptId ? { ...s, featuredOrder: null } : s
+      ))
+    } catch (err) {
+      showToast('error', 'Unpin failed',
+        err?.response?.data?.message || 'Could not unpin script')
+    } finally {
+      setPinningId(null)
+    }
+  }
+
   async function handleDelete() {
     setDeleting(true)
     try {
-      await client.delete(`/scripts/${deleteCandidate.id}`)
+      await deleteScript(deleteCandidate.id)
       setScripts(prev => {
         const next = prev.filter(s => s.id !== deleteCandidate.id)
         if (selectedScript?.id === deleteCandidate.id) {
@@ -421,6 +574,9 @@ export default function ScriptViewer() {
                 isSelected={selectedScript?.id === script.id}
                 onSelect={setSelectedScript}
                 onDelete={setDeleteCandidate}
+                onPin={handlePin}
+                onUnpin={handleUnpin}
+                pinningId={pinningId}
               />
             ))
           )}

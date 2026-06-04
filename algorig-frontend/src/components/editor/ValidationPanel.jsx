@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import apiClient from '../../api/client'
+import { validateScript } from '../../api/scripts'
 
 const KNOWN_ACTIONS = [
   'HardStrike', 'HeavyAttack', 'PowerSurge', 'Patch', 'Firewall',
@@ -28,8 +28,8 @@ export default function ValidationPanel({
   const handleValidate = async () => {
     setIsValidating(true)
     try {
-      const res = await apiClient.post('/scripts/validate', { content: scriptContent })
-      setValidationResult(res.data)
+      const data = await validateScript(scriptContent)
+      setValidationResult(data)
     } catch (err) {
       setValidationResult({
         valid: false,

@@ -59,6 +59,34 @@ body {
   to   { width: 0%; }
 }
 
+@keyframes robotShake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  10% { transform: translateX(-4px) rotate(-1deg); }
+  20% { transform: translateX(4px) rotate(1deg); }
+  30% { transform: translateX(-3px) rotate(-0.5deg); }
+  40% { transform: translateX(3px) rotate(0.5deg); }
+  50% { transform: translateX(-2px) rotate(-0.5deg); }
+  60% { transform: translateX(2px) rotate(0.5deg); }
+  70% { transform: translateX(-1px) rotate(0deg); }
+  80% { transform: translateX(1px) rotate(0deg); }
+  90% { transform: translateX(-1px) rotate(0deg); }
+}
+
+@keyframes boltDrop {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(60px) rotate(180deg); opacity: 0; }
+}
+
+@keyframes sweatDrop {
+  0% { transform: translateY(0); opacity: 0.8; }
+  100% { transform: translateY(30px); opacity: 0; }
+}
+
+@keyframes criticalPulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.4) drop-shadow(0 0 8px #ef4444); }
+}
+
 @keyframes tipSlideLeft {
   from { opacity: 0; transform: translateX(40px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -80,3 +108,305 @@ body {
 .stagger-2 { animation-delay: 0.1s;  opacity: 0; }
 .stagger-3 { animation-delay: 0.15s; opacity: 0; }
 .stagger-4 { animation-delay: 0.2s;  opacity: 0; }
+
+/* ── Arena effect animations ─────────────────────────────────────────────── */
+@keyframes flashFade {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes slashAppear {
+  0%   { opacity: 0; stroke-dasharray: 200; stroke-dashoffset: 200; }
+  20%  { opacity: 1; stroke-dashoffset: 0; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes shockwave {
+  0%   { r: 10; opacity: 1; }
+  100% { r: 80; opacity: 0; }
+}
+
+@keyframes impactBurst {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+  50%  { transform: translate(-50%, -50%) scale(1);   opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
+@keyframes lightningArc {
+  0%   { opacity: 0; stroke-dasharray: 300; stroke-dashoffset: 300; }
+  20%  { opacity: 1; stroke-dashoffset: 0; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes floatUp {
+  0%   { transform: translateY(0) translateX(-50%);   opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateY(-60px) translateX(-50%); opacity: 0; }
+}
+
+@keyframes sparkle {
+  0%   { transform: scale(0);   opacity: 1; }
+  50%  { transform: scale(1.5); opacity: 0.8; }
+  100% { transform: scale(0);   opacity: 0; }
+}
+
+@keyframes particleFly {
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0) translateY(-24px); }
+}
+
+@keyframes glitchFlash {
+  0%   { opacity: 0;   transform: scaleX(1); }
+  20%  { opacity: 1;   transform: scaleX(1.2); }
+  40%  { opacity: 0.5; transform: scaleX(0.8); }
+  60%  { opacity: 1;   transform: scaleX(1.1); }
+  80%  { opacity: 0.3; }
+  100% { opacity: 0; }
+}
+
+@keyframes shieldPulse {
+  0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  30%  { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  60%  { transform: translate(-50%, -50%) scale(1);   opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0; }
+}
+
+@keyframes armorSlide {
+  0%   { transform: translate(calc(-50% - 60px), -50%); opacity: 0; }
+  30%  { transform: translate(-50%, -50%);               opacity: 1; }
+  70%  { transform: translate(-50%, -50%);               opacity: 0.8; }
+  100% { transform: translate(-50%, -50%);               opacity: 0; }
+}
+
+@keyframes boltFly {
+  0%   { transform: scale(1) rotate(0deg);                           opacity: 1; }
+  100% { transform: scale(0) rotate(180deg) translate(40px, -40px); opacity: 0; }
+}
+
+@keyframes scanSweep {
+  0%   { top: 10%; opacity: 1; }
+  50%  { top: 50%; opacity: 0.8; }
+  100% { top: 90%; opacity: 0; }
+}
+
+@keyframes gridScroll {
+  0%   { backgroundPosition: 0 0; }
+  100% { backgroundPosition: 0 40px; }
+}
+
+@keyframes particleDrift {
+  0%,  100% { transform: translateY(0px)   translateX(0px);  opacity: 0.3; }
+  25%        { transform: translateY(-12px) translateX(6px);  opacity: 0.6; }
+  50%        { transform: translateY(-6px)  translateX(-4px); opacity: 0.2; }
+  75%        { transform: translateY(-16px) translateX(8px);  opacity: 0.5; }
+}
+
+/* ── Robot acting animations ─────────────────────────────────────────────── */
+@keyframes lungeRight {
+  0%   { transform: translateX(0) scale(1); }
+  20%  { transform: translateX(calc(var(--lunge-dist, 32px) * 0.3)) scale(1.18); }
+  42%  { transform: translateX(var(--lunge-dist, 32px)) scale(1.22); }
+  65%  { transform: translateX(var(--lunge-dist, 32px)) scale(1.18); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes lungeLeft {
+  0%   { transform: translateX(0) scale(1); }
+  20%  { transform: translateX(calc(var(--lunge-dist, 32px) * -0.3)) scale(1.18); }
+  42%  { transform: translateX(calc(-1 * var(--lunge-dist, 32px))) scale(1.22); }
+  65%  { transform: translateX(calc(-1 * var(--lunge-dist, 32px))) scale(1.18); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes heavyWindup {
+  0%   { transform: translateX(0) scale(1); }
+  18%  { transform: translateX(-20px) scale(1.14); }
+  48%  { transform: translateX(var(--lunge-dist, 40px)) scale(1.28); }
+  70%  { transform: translateX(var(--lunge-dist, 40px)) scale(1.20); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes heavyWindupLeft {
+  0%   { transform: translateX(0) scale(1); }
+  18%  { transform: translateX(20px) scale(1.14); }
+  48%  { transform: translateX(calc(-1 * var(--lunge-dist, 40px))) scale(1.28); }
+  70%  { transform: translateX(calc(-1 * var(--lunge-dist, 40px))) scale(1.20); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes powerSurgeAttack {
+  0%   { transform: scale(1); filter: brightness(1); }
+  15%  { transform: scale(1.10); filter: brightness(1.3) drop-shadow(0 0 12px #a855f7); }
+  30%  { transform: scale(1.25); filter: brightness(1.5) drop-shadow(0 0 20px #c084fc); }
+  55%  { transform: scale(1.20); filter: brightness(1.3) drop-shadow(0 0 14px #a855f7); }
+  80%  { transform: scale(1.08); filter: brightness(1.1); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes healBounce {
+  0%   { transform: translateY(0) scale(1); filter: brightness(1); }
+  25%  { transform: translateY(-18px) scale(1.12); filter: brightness(1.3) drop-shadow(0 0 10px #22c55e); }
+  55%  { transform: translateY(-10px) scale(1.08); filter: brightness(1.15); }
+  80%  { transform: translateY(-3px) scale(1.03); }
+  100% { transform: translateY(0) scale(1); filter: brightness(1); }
+}
+
+@keyframes puffUp {
+  0%   { transform: scale(1); filter: brightness(1); }
+  30%  { transform: scale(1.18); filter: brightness(1.3) drop-shadow(0 0 12px #3b82f6); }
+  60%  { transform: scale(1.12); filter: brightness(1.15); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes virusLean {
+  0%   { transform: translateX(0) rotate(0deg); filter: brightness(1); }
+  25%  { transform: translateX(10px) rotate(4deg); filter: brightness(1.2) drop-shadow(0 0 10px #a855f7); }
+  55%  { transform: translateX(18px) rotate(6deg); filter: brightness(1.3) drop-shadow(0 0 14px #c084fc); }
+  75%  { transform: translateX(16px) rotate(5deg); }
+  100% { transform: translateX(0) rotate(0deg); filter: brightness(1); }
+}
+
+@keyframes virusLeanLeft {
+  0%   { transform: translateX(0) rotate(0deg); filter: brightness(1); }
+  25%  { transform: translateX(-10px) rotate(-4deg); filter: brightness(1.2) drop-shadow(0 0 10px #a855f7); }
+  55%  { transform: translateX(-18px) rotate(-6deg); filter: brightness(1.3) drop-shadow(0 0 14px #c084fc); }
+  75%  { transform: translateX(-16px) rotate(-5deg); }
+  100% { transform: translateX(0) rotate(0deg); filter: brightness(1); }
+}
+
+@keyframes scanPulse {
+  0%,100% { transform: scale(1); filter: brightness(1); }
+  30%      { transform: scale(1.10); filter: brightness(1.2) drop-shadow(0 0 10px #38bdf8); }
+  60%      { transform: scale(1.06); filter: brightness(1.1); }
+}
+
+@keyframes stallSag {
+  0%   { transform: translateY(0) rotate(0deg); }
+  30%  { transform: translateY(12px) rotate(-5deg); }
+  70%  { transform: translateY(8px) rotate(-3deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes knockbackRight {
+  0%   { transform: translateX(0) rotate(0deg); }
+  20%  { transform: translateX(var(--kb-dist, 20px)) rotate(3deg); }
+  45%  { transform: translateX(var(--kb-dist, 20px)) rotate(2deg); }
+  70%  { transform: translateX(calc(var(--kb-dist, 20px) * 0.6)) rotate(1deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+
+@keyframes knockbackLeft {
+  0%   { transform: translateX(0) rotate(0deg); }
+  20%  { transform: translateX(calc(-1 * var(--kb-dist, 20px))) rotate(-3deg); }
+  45%  { transform: translateX(calc(-1 * var(--kb-dist, 20px))) rotate(-2deg); }
+  70%  { transform: translateX(calc(var(--kb-dist, 20px) * -0.6)) rotate(-1deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+
+@keyframes electricShake {
+  0%,100% { transform: translateX(0); opacity: 1; }
+  8%  { transform: translateX(-6px); opacity: 0.85; }
+  16% { transform: translateX(6px);  opacity: 1; }
+  24% { transform: translateX(-5px); opacity: 0.9; }
+  32% { transform: translateX(5px);  opacity: 1; }
+  45% { transform: translateX(-4px); opacity: 0.9; }
+  58% { transform: translateX(3px);  opacity: 1; }
+  72% { transform: translateX(-2px); }
+  86% { transform: translateX(1px); }
+}
+
+@keyframes glitchWobble {
+  0%,100% { transform: translateX(0) scaleX(1); opacity: 1; }
+  10% { transform: translateX(-8px) scaleX(1.08); opacity: 0.75; }
+  22% { transform: translateX(8px) scaleX(0.92); opacity: 1; }
+  35% { transform: translateX(-5px) scaleX(1.05); opacity: 0.85; }
+  50% { transform: translateX(5px) scaleX(0.96); opacity: 1; }
+  70% { transform: translateX(-2px) scaleX(1.02); opacity: 0.95; }
+  85% { transform: translateX(1px); opacity: 1; }
+}
+
+/* Screen shake */
+@keyframes screenShake {
+  0%,100% { transform: translate(0, 0); }
+  10% { transform: translate(-3px, -2px); }
+  20% { transform: translate(3px,  2px); }
+  30% { transform: translate(-3px, 1px); }
+  40% { transform: translate(3px, -1px); }
+  55% { transform: translate(-2px, 2px); }
+  70% { transform: translate(2px, -2px); }
+  85% { transform: translate(-1px, 1px); }
+}
+
+/* Turn header slide-in */
+@keyframes turnHeaderSlide {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Spark fly outward */
+@keyframes sparkFlyOut {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  60%  { opacity: 0.8; }
+  100% { opacity: 0; transform: translate(var(--sx, 30px), var(--sy, -30px)) scale(0); }
+}
+
+/* Action pulse on turn header */
+@keyframes actionPulse {
+  0%   { opacity: 0.7; transform: scale(0.95); }
+  50%  { opacity: 1;   transform: scale(1.02); }
+  100% { opacity: 1;   transform: scale(1); }
+}
+
+/* ── HP bar flash ────────────────────────────────────────────────────────── */
+@keyframes hpFlashDamage {
+  0%   { filter: brightness(3) saturate(0.2); }
+  35%  { filter: brightness(1.8) saturate(0.5) sepia(1); }
+  100% { filter: brightness(1) saturate(1); }
+}
+
+@keyframes hpFlashHeal {
+  0%   { filter: brightness(3) saturate(0.2); }
+  35%  { filter: brightness(1.5) saturate(1) hue-rotate(80deg); }
+  100% { filter: brightness(1) saturate(1) hue-rotate(0deg); }
+}
+
+/* ── Floating damage numbers ─────────────────────────────────────────────── */
+@keyframes damageFloat {
+  0%   { opacity: 1; transform: translateY(0); }
+  15%  { opacity: 1; transform: translateY(-6px); }
+  80%  { opacity: 0.8; transform: translateY(-52px); }
+  100% { opacity: 0; transform: translateY(-64px); }
+}
+
+@keyframes healFloat {
+  0%   { opacity: 1; transform: translateY(0); }
+  15%  { opacity: 1; transform: translateY(-4px); }
+  80%  { opacity: 0.8; transform: translateY(-42px); }
+  100% { opacity: 0; transform: translateY(-52px); }
+}
+
+/* ── Tooltip fade-in ─────────────────────────────────────────────────────── */
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Stack Overflow hyper beam ───────────────────────────────────────────── */
+@keyframes beamTravel {
+  0%   { transform: scaleX(0); opacity: 0; }
+  18%  { transform: scaleX(1); opacity: 1; }
+  75%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* ── Stack Overflow robot charge-up ─────────────────────────────────────── */
+@keyframes stackOverflowCharge {
+  0%   { transform: scale(1);    filter: brightness(1); }
+  20%  { transform: scale(1.06); filter: brightness(1.4) drop-shadow(0 0 8px rgba(217,70,239,0.8)); }
+  46%  { transform: scale(1.18); filter: brightness(1.9) drop-shadow(0 0 18px rgba(217,70,239,1)); }
+  66%  { transform: scale(1.14); filter: brightness(1.5) drop-shadow(0 0 10px rgba(168,85,247,0.9)); }
+  82%  { transform: scale(0.97); filter: brightness(1.1) drop-shadow(0 0 4px rgba(168,85,247,0.4)); }
+  100% { transform: scale(1);    filter: brightness(1); }
+}
