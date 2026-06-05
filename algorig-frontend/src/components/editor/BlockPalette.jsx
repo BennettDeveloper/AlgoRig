@@ -290,7 +290,7 @@ function Divider() {
 
 export default function BlockPalette({ onAddBlock, userVars = [] }) {
   return (
-    <div style={{
+    <div data-tour="block-palette" style={{
       width: 220,
       minWidth: 220,
       background: 'rgba(0,0,0,0.3)',
@@ -316,7 +316,11 @@ export default function BlockPalette({ onAddBlock, userVars = [] }) {
 
       {/* ── CONTROL ── */}
       <SectionHeader icon="⚙️" label="Control" color="#f59e0b" />
-      {CONTROL_BLOCKS.map(b => (
+      {CONTROL_BLOCKS.map(b => b.type === 'ifelse' ? (
+        <div key={b.type} data-tour="block-if">
+          <DraggablePaletteBlock item={b} onAddBlock={onAddBlock} />
+        </div>
+      ) : (
         <DraggablePaletteBlock key={b.type} item={b} onAddBlock={onAddBlock} />
       ))}
 
@@ -324,7 +328,11 @@ export default function BlockPalette({ onAddBlock, userVars = [] }) {
 
       {/* ── MEMORY ── */}
       <SectionHeader icon="💾" label="Memory" color="#22d3ee" />
-      {MEMORY_BLOCKS.map(b => (
+      {MEMORY_BLOCKS.map(b => b.type === 'set' ? (
+        <div key={b.type} data-tour="block-set">
+          <DraggablePaletteBlock item={b} onAddBlock={onAddBlock} />
+        </div>
+      ) : (
         <DraggablePaletteBlock key={b.type} item={b} onAddBlock={onAddBlock} />
       ))}
 

@@ -18,6 +18,7 @@ const BattleReplay   = lazy(() => import('./pages/BattleReplay'))
 const Profile        = lazy(() => import('./pages/Profile'))
 const Repository     = lazy(() => import('./pages/Repository'))
 const ScriptDetail   = lazy(() => import('./pages/ScriptDetail'))
+const Leaderboard    = lazy(() => import('./pages/Leaderboard'))
 
 const LoadingFallback = () => (
   <div style={{
@@ -60,6 +61,7 @@ function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="robots" element={<RobotBrowser />} />
+          <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="profile/:username" element={<Profile />} />
           <Route path="repository" element={<Repository />} />
           <Route path="repository/:id" element={<ScriptDetail />} />

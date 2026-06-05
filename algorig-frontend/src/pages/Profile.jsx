@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { getPublicProfile, uploadAvatar, unpinScript } from '../api/users'
+import { getRepository } from '../api/scripts'
 import EditProfileModal from '../components/profile/EditProfileModal'
 import AchievementBadge from '../components/profile/AchievementBadge'
+import ScriptRepositoryCard from '../components/repository/ScriptRepositoryCard'
 
 const ALL_ACHIEVEMENTS = [
   { code: 'FIRST_BLOOD',     icon: '⚔️', displayName: 'First Blood',    description: 'Win your first battle' },
@@ -298,27 +300,32 @@ export default function Profile() {
 
       {/* ── Tabs ── */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        {['scripts', 'achievements'].map(tab => (
+        {[
+          { id: 'scripts',      label: 'Featured' },
+          { id: 'public',       label: 'Public Scripts' },
+          { id: 'achievements', label: 'Achievements' },
+        ].map(tab => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             style={{
               padding: '10px 20px',
               background: 'none',
               border: 'none',
-              borderBottom: `2px solid ${activeTab === tab ? '#f97316' : 'transparent'}`,
-              color: activeTab === tab ? '#f97316' : '#555577',
+              borderBottom: `2px solid ${activeTab === tab.id ? '#f97316' : 'transparent'}`,
+              color: activeTab === tab.id ? '#f97316' : '#555577',
               fontSize: 13,
               fontWeight: 600,
               cursor: 'pointer',
-              textTransform: 'capitalize',
               letterSpacing: '0.05em',
               transition: 'color 0.15s',
               marginBottom: -1,
               fontFamily: 'inherit',
             }}
+            onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#f97316' }}
+            onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#555577' }}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -372,6 +379,11 @@ export default function Profile() {
         </div>
       )}
 
+      {/* ── Tab: Public Scripts ── */}
+      {activeTab === 'public' && (
+        <PublicScriptsTab username={username} />
+      )}
+
       {/* ── Tab: Achievements ── */}
       {activeTab === 'achievements' && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
@@ -395,6 +407,66 @@ export default function Profile() {
           onSaved={handleProfileSaved}
         />
       )}
+    </div>
+  )
+}
+
+// TODO: replace with server-side filtering once /api/scripts/public supports ?username=X
+// Currently uses the /api/repository endpoint which already supports authorUsername filtering.
+function PublicScriptsTab({ username }) {
+  const [scripts, setScripts]   = useState([])
+  const [loading, setLoading]   = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    getRepository({ authorUsername: username, page: 0, size: 24, sort: 'mostUsed' })
+      .then(data => setScripts(data.content ?? []))
+      .catch(() => setScripts([]))
+      .finally(() => setLoading(false))
+  }, [username])
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 10, padding: '60px 0',
+        color: '#555577', fontSize: 13,
+        fontFamily: 'JetBrains Mono, monospace',
+      }}>
+        <div style={{
+          width: 16, height: 16,
+          border: '2px solid rgba(249,115,22,0.2)',
+          borderTopColor: '#f97316',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        Loading scripts…
+      </div>
+    )
+  }
+
+  if (scripts.length === 0) {
+    return (
+      <div style={{
+        background: 'rgba(255,255,255,0.01)',
+        border: '1px dashed rgba(255,255,255,0.08)',
+        borderRadius: 14, padding: '48px 24px',
+        textAlign: 'center', color: '#444466', fontSize: 14,
+      }}>
+        No public scripts yet.
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+      gap: 16,
+    }}>
+      {scripts.map(script => (
+        <ScriptRepositoryCard key={script.id} script={script} />
+      ))}
     </div>
   )
 }

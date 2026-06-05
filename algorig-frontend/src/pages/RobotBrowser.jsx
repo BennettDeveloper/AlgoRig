@@ -114,7 +114,7 @@ export default function RobotBrowser() {
       </div>
 
       {/* Tier filter bar */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
+      <div data-tour="tier-filter" style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
         {[0, 1, 2, 3, 4, 5].map(tier => {
           const active = selectedTier === tier
           return (
@@ -154,12 +154,12 @@ export default function RobotBrowser() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
-          {filtered.map(robot => (
-            <RobotCard
-              key={robot.id}
-              robot={robot}
-              onClick={() => setSelectedRobot(robot)}
-            />
+          {filtered.map((robot, index) => index === 0 ? (
+            <div key={robot.id} data-tour="robot-card-first">
+              <RobotCard robot={robot} onClick={() => setSelectedRobot(robot)} />
+            </div>
+          ) : (
+            <RobotCard key={robot.id} robot={robot} onClick={() => setSelectedRobot(robot)} />
           ))}
         </div>
       )}

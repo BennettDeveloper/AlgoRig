@@ -422,7 +422,7 @@ export default function BattleLauncher() {
             SELECT YOUR COMBATANTS
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
+          <div data-tour="battle-selectors" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
             <div>
               <div style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.15em', color: '#f97316', marginBottom: 12 }}>
                 ROBOT A
@@ -438,7 +438,7 @@ export default function BattleLauncher() {
           </div>
 
           {/* Tier cap */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <div data-tour="tier-cap" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
             <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.12em', color: '#555577', width: 72 }}>
               TIER CAP
             </span>

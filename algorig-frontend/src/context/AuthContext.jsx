@@ -1,10 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTourContext } from './TourContext'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const navigate = useNavigate()
+  const { startTour } = useTourContext()
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -32,7 +34,10 @@ export function AuthProvider({ children }) {
     localStorage.setItem('algorig_user', JSON.stringify(userObj))
     setToken(newToken)
     setUser(userObj)
-  }, [])
+    if (!localStorage.getItem('algorig_tour_completed')) {
+      setTimeout(() => startTour(), 800)
+    }
+  }, [startTour])
 
   const logout = useCallback(() => {
     localStorage.removeItem('algorig_token')

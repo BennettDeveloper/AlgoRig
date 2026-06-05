@@ -1,10 +1,12 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useTourContext } from '../../context/TourContext'
 
 const publicLinks = [
   { to: '/', label: 'Dashboard' },
   { to: '/robots', label: 'Robots' },
   { to: '/repository', label: 'Repository' },
+  { to: '/leaderboard', label: '🏆 Leaderboard' },
 ]
 
 const authedLinks = [
@@ -29,15 +31,21 @@ const navLinkStyle = ({ isActive }) => ({
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth()
+  const { startTour } = useTourContext()
   const navigate = useNavigate()
   const links = isAuthenticated ? authedLinks : publicLinks
+
+  function handleReplayTour() {
+    localStorage.removeItem('algorig_tour_completed')
+    startTour()
+  }
 
   const initial = user?.username
     ? user.username.charAt(0).toUpperCase()
     : user?.email?.charAt(0).toUpperCase() ?? '?'
 
   return (
-    <nav style={{
+    <nav data-tour="navbar" style={{
       background: 'rgba(8,8,16,0.85)',
       backdropFilter: 'blur(20px)',
       borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -172,6 +180,39 @@ export default function Navbar() {
               }}
             >
               Logout
+            </button>
+
+            {/* Replay Tour button */}
+            <button
+              onClick={handleReplayTour}
+              title="Replay Tour"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                border: '1px solid #f97316',
+                background: 'transparent',
+                color: '#f97316',
+                fontSize: '14px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = '#f97316'
+                e.currentTarget.style.color = '#000'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = '#f97316'
+              }}
+            >
+              ?
             </button>
           </>
         ) : (

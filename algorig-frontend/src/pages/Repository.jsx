@@ -265,7 +265,11 @@ export default function Repository() {
           </div>
         ) : (
           <div className="repo-grid">
-            {scripts.map(script => (
+            {scripts.map((script, index) => index === 0 ? (
+              <div key={script.id} data-tour="repo-card-first" style={{ display: 'flex', flexDirection: 'column' }}>
+                <ScriptRepositoryCard script={script} />
+              </div>
+            ) : (
               <ScriptRepositoryCard key={script.id} script={script} />
             ))}
           </div>
