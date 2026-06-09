@@ -7,6 +7,7 @@ import com.algorig.algorig_backend.dto.UserAchievementDto;
 import com.algorig.algorig_backend.engine.BattleEngine;
 import com.algorig.algorig_backend.engine.BattleState;
 import com.algorig.algorig_backend.model.entity.Battle;
+import com.algorig.algorig_backend.model.entity.CustomRobot;
 import com.algorig.algorig_backend.model.entity.Robot;
 import com.algorig.algorig_backend.model.entity.Script;
 import com.algorig.algorig_backend.model.entity.User;
@@ -14,6 +15,7 @@ import com.algorig.algorig_backend.model.entity.UserAchievement;
 import com.algorig.algorig_backend.parser.ParsedScript;
 import com.algorig.algorig_backend.parser.ScriptParser;
 import com.algorig.algorig_backend.repository.BattleRepository;
+import com.algorig.algorig_backend.repository.CustomRobotRepository;
 import com.algorig.algorig_backend.repository.RobotRepository;
 import com.algorig.algorig_backend.repository.ScriptRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -33,6 +35,7 @@ public class BattleService {
 
     private final BattleRepository battleRepository;
     private final RobotRepository robotRepository;
+    private final CustomRobotRepository customRobotRepository;
     private final ScriptRepository scriptRepository;
     private final BattleEngine battleEngine;
     private final ScriptParser scriptParser;
@@ -83,10 +86,47 @@ public class BattleService {
     }
 
     public BattleDto startBattle(BattleRequestDto request, User owner) {
-        Robot robotA = robotRepository.findById(request.getRobotAId())
-                .orElseThrow(() -> new RuntimeException("Robot A not found: " + request.getRobotAId()));
-        Robot robotB = robotRepository.findById(request.getRobotBId())
-                .orElseThrow(() -> new RuntimeException("Robot B not found: " + request.getRobotBId()));
+        // ── Resolve Robot A (user slot) ───────────────────────────────────────
+        Robot robotA;
+        Long robotAIdForRecord;
+        if ("CUSTOM".equals(request.getUserRobotType())) {
+            Long customId = request.getUserCustomRobotId();
+            if (customId == null)
+                throw new IllegalArgumentException("userCustomRobotId is required when userRobotType is CUSTOM.");
+            CustomRobot cr = customRobotRepository.findById(customId)
+                    .orElseThrow(() -> new RuntimeException("Custom robot A not found: " + customId));
+            if (cr.getTier().getValue() > request.getTierCap())
+                throw new IllegalArgumentException(
+                        "Custom robot '" + cr.getName() + "' is Tier " + cr.getTier().getValue()
+                        + " but the tier cap is " + request.getTierCap() + ".");
+            robotA = toRobotEntity(cr);
+            robotAIdForRecord = customId;
+        } else {
+            robotA = robotRepository.findById(request.getRobotAId())
+                    .orElseThrow(() -> new RuntimeException("Robot A not found: " + request.getRobotAId()));
+            robotAIdForRecord = request.getRobotAId();
+        }
+
+        // ── Resolve Robot B (enemy slot) ──────────────────────────────────────
+        Robot robotB;
+        Long robotBIdForRecord;
+        if ("CUSTOM".equals(request.getEnemyRobotType())) {
+            Long customId = request.getEnemyCustomRobotId();
+            if (customId == null)
+                throw new IllegalArgumentException("enemyCustomRobotId is required when enemyRobotType is CUSTOM.");
+            CustomRobot cr = customRobotRepository.findById(customId)
+                    .orElseThrow(() -> new RuntimeException("Custom robot B not found: " + customId));
+            if (cr.getTier().getValue() > request.getTierCap())
+                throw new IllegalArgumentException(
+                        "Custom robot '" + cr.getName() + "' is Tier " + cr.getTier().getValue()
+                        + " but the tier cap is " + request.getTierCap() + ".");
+            robotB = toRobotEntity(cr);
+            robotBIdForRecord = customId;
+        } else {
+            robotB = robotRepository.findById(request.getRobotBId())
+                    .orElseThrow(() -> new RuntimeException("Robot B not found: " + request.getRobotBId()));
+            robotBIdForRecord = request.getRobotBId();
+        }
 
         Script scriptA = scriptRepository.findById(request.getScriptAId())
                 .orElseThrow(() -> new RuntimeException("Script A not found: " + request.getScriptAId()));
@@ -113,8 +153,10 @@ public class BattleService {
 
         Battle battle = Battle.builder()
                 .battleCode(battleCode)
-                .robotAId(request.getRobotAId())
-                .robotBId(request.getRobotBId())
+                .robotAId(robotAIdForRecord)
+                .robotBId(robotBIdForRecord)
+                .robotAType("CUSTOM".equals(request.getUserRobotType()) ? "CUSTOM" : "PRESET")
+                .robotBType("CUSTOM".equals(request.getEnemyRobotType()) ? "CUSTOM" : "PRESET")
                 .scriptA(scriptA)
                 .scriptB(scriptB)
                 .owner(owner)
@@ -151,9 +193,18 @@ public class BattleService {
         return battle.getOwner().getId().equals(user.getId());
     }
 
+    private RobotDto resolveRobotDto(Long robotId, String robotType) {
+        if ("CUSTOM".equals(robotType)) {
+            return customRobotRepository.findById(robotId)
+                    .map(cr -> toRobotDto(toRobotEntity(cr)))
+                    .orElse(null);
+        }
+        return robotRepository.findById(robotId).map(this::toRobotDto).orElse(null);
+    }
+
     private BattleDto toDto(Battle battle) {
-        RobotDto robotA = robotRepository.findById(battle.getRobotAId()).map(this::toRobotDto).orElse(null);
-        RobotDto robotB = robotRepository.findById(battle.getRobotBId()).map(this::toRobotDto).orElse(null);
+        RobotDto robotA = resolveRobotDto(battle.getRobotAId(), battle.getRobotAType());
+        RobotDto robotB = resolveRobotDto(battle.getRobotBId(), battle.getRobotBType());
         return BattleDto.builder()
                 .id(battle.getId())
                 .battleCode(battle.getBattleCode())
@@ -171,6 +222,27 @@ public class BattleService {
                 .ownerUsername(battle.getOwner() != null ? battle.getOwner().getUsername() : null)
                 .ownerAvatarUrl(battle.getOwner() != null ? battle.getOwner().getAvatarUrl() : null)
                 .isPublic(battle.isPublic())
+                .build();
+    }
+
+    private Robot toRobotEntity(CustomRobot cr) {
+        return Robot.builder()
+                .id(cr.getId())
+                .name(cr.getName())
+                .tier(cr.getTier().getValue())
+                .systemIntegrity(cr.getHp())
+                .coreImpact(cr.getCoreImpact())
+                .exploitPower(cr.getExploitPower())
+                .clockSpeed(cr.getClockSpeed())
+                .chassisArmor(cr.getChassisArmor())
+                .firewallStrength(cr.getFirewallStrength())
+                .battery(cr.getBattery())
+                .passiveAbility(cr.getPassiveAbility().name())
+                .stability(100)
+                .wattage(0)
+                .cooling(0)
+                .memory(0)
+                .recovery(0)
                 .build();
     }
 

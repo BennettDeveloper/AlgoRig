@@ -4,11 +4,9 @@ import com.algorig.algorig_backend.dto.PinScriptDto;
 import com.algorig.algorig_backend.dto.ScriptDto;
 import com.algorig.algorig_backend.dto.ScriptSaveRequestDto;
 import com.algorig.algorig_backend.dto.ScriptValidationResultDto;
-import com.algorig.algorig_backend.model.entity.Robot;
 import com.algorig.algorig_backend.model.entity.Script;
 import com.algorig.algorig_backend.model.entity.User;
 import com.algorig.algorig_backend.model.entity.ScriptUpdateHistory;
-import com.algorig.algorig_backend.repository.RobotRepository;
 import com.algorig.algorig_backend.repository.ScriptRepository;
 import com.algorig.algorig_backend.repository.ScriptUpdateHistoryRepository;
 import com.algorig.algorig_backend.validation.ScriptValidator;
@@ -19,11 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,7 +29,6 @@ public class ScriptService {
     private final ScriptRepository scriptRepository;
     private final ScriptValidator scriptValidator;
     private final ScriptUpdateHistoryRepository scriptUpdateHistoryRepository;
-    private final RobotRepository robotRepository;
     private final ScriptStatsService scriptStatsService;
 
     @Transactional(readOnly = true)
@@ -64,7 +58,7 @@ public class ScriptService {
                 .content(dto.getContent())
                 .owner(owner)
                 .isPublic(true)
-                .requiredRobots(resolveRobots(dto.getRequiredRobotIds()))
+                .requiredTiers(serializeTiers(dto.getRequiredTiers()))
                 .build();
         Script saved = scriptRepository.save(script);
         scriptUpdateHistoryRepository.save(
@@ -82,23 +76,14 @@ public class ScriptService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
 
-        // Detect changes before modifying
         boolean contentChanged = !Objects.equals(script.getContent(), dto.getContent());
-
-        Set<Long> currentIds = script.getRequiredRobots()
-                .stream()
-                .map(Robot::getId)
-                .collect(Collectors.toSet());
-        Set<Long> newIds = dto.getRequiredRobotIds() != null
-                ? new HashSet<>(dto.getRequiredRobotIds())
-                : new HashSet<>();
-        boolean requirementsChanged = !currentIds.equals(newIds);
+        String newTiersStr = serializeTiers(dto.getRequiredTiers());
+        boolean requirementsChanged = !Objects.equals(script.getRequiredTiers(), newTiersStr);
         boolean statsResetNeeded = contentChanged || requirementsChanged;
 
         script.setName(dto.getName());
         script.setContent(dto.getContent());
-        script.getRequiredRobots().clear();
-        script.setRequiredRobots(resolveRobots(dto.getRequiredRobotIds()));
+        script.setRequiredTiers(newTiersStr);
 
         Script saved = scriptRepository.save(script);
         scriptUpdateHistoryRepository.save(
@@ -108,6 +93,25 @@ public class ScriptService {
                         .build());
 
         if (statsResetNeeded) {
+            scriptStatsService.resetStats(saved, LocalDateTime.now());
+        }
+
+        return toDto(saved);
+    }
+
+    public ScriptDto updateRequiredTiers(Long id, List<String> tiers, User requestingUser) {
+        Script script = scriptRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Script not found"));
+        if (!isOwner(script, requestingUser)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
+
+        String newTiersStr = serializeTiers(tiers);
+        boolean requirementsChanged = !Objects.equals(script.getRequiredTiers(), newTiersStr);
+        script.setRequiredTiers(newTiersStr);
+        Script saved = scriptRepository.save(script);
+
+        if (requirementsChanged) {
             scriptStatsService.resetStats(saved, LocalDateTime.now());
         }
 
@@ -137,7 +141,6 @@ public class ScriptService {
         if (!isOwner(script, user)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
         }
-        // Displace any script currently occupying this order slot
         scriptRepository.findByOwnerAndFeaturedOrderIsNotNullOrderByFeaturedOrderAsc(user)
                 .stream()
                 .filter(s -> s.getFeaturedOrder() == order && !s.getId().equals(scriptId))
@@ -163,9 +166,9 @@ public class ScriptService {
         scriptRepository.save(script);
     }
 
-    private Set<Robot> resolveRobots(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) return new HashSet<>();
-        return new HashSet<>(robotRepository.findAllById(ids));
+    private String serializeTiers(List<String> tiers) {
+        if (tiers == null || tiers.isEmpty()) return null;
+        return tiers.stream().sorted().collect(Collectors.joining(","));
     }
 
     private boolean isOwner(Script script, User user) {
@@ -175,7 +178,7 @@ public class ScriptService {
 
     private ScriptDto toDto(Script script) {
         User owner = script.getOwner();
-        ScriptDto dto = ScriptDto.builder()
+        return ScriptDto.builder()
                 .id(script.getId())
                 .name(script.getName())
                 .content(script.getContent())
@@ -186,15 +189,7 @@ public class ScriptService {
                 .ownerUsername(owner != null ? owner.getUsername() : null)
                 .isPublic(script.isPublic())
                 .featuredOrder(script.getFeaturedOrder())
+                .requiredTiers(script.getRequiredTiersList())
                 .build();
-
-        List<Long> requiredRobotIds = script.getRequiredRobots()
-                .stream()
-                .map(Robot::getId)
-                .sorted()
-                .collect(Collectors.toList());
-        dto.setRequiredRobotIds(requiredRobotIds);
-        dto.setHasRequirements(!requiredRobotIds.isEmpty());
-        return dto;
     }
 }

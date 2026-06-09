@@ -12,3 +12,6 @@ export const getRepository     = (params)    => client.get('/repository', { para
 export const getScriptDetail   = (id)        => client.get(`/repository/${id}`).then(r => r.data)
 export const getScriptBattles  = (id, page = 0, size = 10) =>
   client.get(`/repository/${id}/battles`, { params: { page, size } }).then(r => r.data)
+
+export const updateRequiredTiers = (scriptId, tiers) =>
+  client.put(`/scripts/${scriptId}/required-tiers`, { tiers }).then(r => r.data)

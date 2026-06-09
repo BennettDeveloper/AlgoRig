@@ -2,6 +2,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 
+const TIER_CONFIG = [
+  { key: 'TIER_1', color: '#a1a5b4', short: 'T1' },
+  { key: 'TIER_2', color: '#22c55e', short: 'T2' },
+  { key: 'TIER_3', color: '#3b82f6', short: 'T3' },
+  { key: 'TIER_4', color: '#7c3aed', short: 'T4' },
+  { key: 'TIER_5', color: '#facc15', short: 'T5' },
+]
+
 const DIFFICULTY = {
   'Unranked':     { color: '#555577', bg: 'rgba(255,255,255,0.04)',  border: 'rgba(255,255,255,0.08)' },
   'Beginner':     { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)',   border: 'rgba(59,130,246,0.25)'  },
@@ -48,33 +56,43 @@ export default function ScriptRepositoryCard({ script }) {
         e.currentTarget.style.boxShadow  = 'none'
       }}
     >
-      {/* Top row: difficulty badge + requirements badge + use count */}
+      {/* Top row: difficulty badge + use count */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-          <span style={{
-            fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
-            fontWeight: 700, letterSpacing: '0.06em',
-            color: diff.color, background: diff.bg,
-            border: `1px solid ${diff.border}`,
-            borderRadius: 4, padding: '2px 8px', flexShrink: 0,
-          }}>
-            {stats.difficultyLabel ?? 'Unranked'}
-          </span>
-          {script.hasRequirements && (
-            <span style={{
-              fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
-              color: '#f97316', background: 'rgba(249,115,22,0.08)',
-              border: '1px solid rgba(249,115,22,0.25)',
-              borderRadius: 4, padding: '2px 6px', flexShrink: 0,
-            }}>
-              ⚙️ Required
-            </span>
-          )}
-        </div>
+        <span style={{
+          fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+          fontWeight: 700, letterSpacing: '0.06em',
+          color: diff.color, background: diff.bg,
+          border: `1px solid ${diff.border}`,
+          borderRadius: 4, padding: '2px 8px', flexShrink: 0,
+        }}>
+          {stats.difficultyLabel ?? 'Unranked'}
+        </span>
         <span style={{ fontSize: '0.75rem', color: '#888', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
           {stats.timesUsed ?? 0} battles
         </span>
       </div>
+
+      {/* Tier requirements row */}
+      {script.requiredTiers?.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: '#666' }}>Requires:</span>
+          {script.requiredTiers.map(tierKey => {
+            const cfg = TIER_CONFIG.find(c => c.key === tierKey)
+            if (!cfg) return null
+            return (
+              <span key={tierKey} style={{
+                background: `${cfg.color}26`,
+                border: `1px solid ${cfg.color}`,
+                color: cfg.color,
+                padding: '2px 8px', borderRadius: 4,
+                fontSize: 11, fontWeight: 600,
+              }}>
+                {cfg.short}
+              </span>
+            )
+          })}
+        </div>
+      )}
 
       {/* Script name */}
       <div style={{

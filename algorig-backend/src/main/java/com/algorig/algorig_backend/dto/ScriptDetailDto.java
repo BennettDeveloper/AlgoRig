@@ -25,7 +25,5 @@ public class ScriptDetailDto {
     private boolean isPublic;
     private ScriptStatsDto stats;
     private List<ScriptUpdateHistoryDto> versionHistory;
-    private List<Long> requiredRobotIds;
-    private List<RobotDto> requiredRobots;
-    private boolean hasRequirements;
+    private List<String> requiredTiers;
 }

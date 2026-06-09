@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import client from '../api/client'
-import { createScript, updateScript as apiUpdateScript, getScriptDetail } from '../api/scripts'
+import { createScript, updateScript as apiUpdateScript, getScriptDetail, updateRequiredTiers } from '../api/scripts'
 import {
   DndContext,
   DragOverlay,
@@ -13,13 +13,27 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import Modal from '../components/ui/Modal'
-import RobotMultiSelectPicker from '../components/robots/RobotMultiSelectPicker'
 import BlockPalette from '../components/editor/BlockPalette'
 import { TooltipProvider } from '../components/editor/TooltipContext'
 import BlockCanvas from '../components/editor/BlockCanvas'
 import TextEditor from '../components/editor/TextEditor'
 import ValidationPanel from '../components/editor/ValidationPanel'
 import { blocksToScript, scriptToBlocks } from '../utils/scriptConverter'
+
+const TIER_CONFIG = [
+  { key: 'TIER_1', label: 'Tier 1', color: '#a1a5b4' },
+  { key: 'TIER_2', label: 'Tier 2', color: '#22c55e' },
+  { key: 'TIER_3', label: 'Tier 3', color: '#3b82f6' },
+  { key: 'TIER_4', label: 'Tier 4', color: '#7c3aed' },
+  { key: 'TIER_5', label: 'Tier 5', color: '#facc15' },
+]
+
+function buildTierStatusText(tiers) {
+  const sorted = [...tiers].sort()
+  const labels = sorted.map(t => `Tier ${t.replace('TIER_', '')}`)
+  if (labels.length === 1) return `${labels[0]} robots only`
+  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]} robots only`
+}
 
 const ModeButton = ({ active, onClick, children }) => (
   <button
@@ -167,10 +181,6 @@ function SaveConfirmModal({ script, onKeepEditing, onBackToScripts }) {
   )
 }
 
-function arraysEqual(a, b) {
-  return a.length === b.length && a.every((v, i) => v === b[i])
-}
-
 export default function ScriptEditor() {
   const { id: scriptId } = useParams()
   const navigate = useNavigate()
@@ -189,12 +199,14 @@ export default function ScriptEditor() {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [saveError, setSaveError] = useState('')
 
-  const [requiredRobotIds, setRequiredRobotIds]                   = useState([])
+  const [requiredTiers, setRequiredTiers]                         = useState([])
+  const [selectedTiers, setSelectedTiers]                         = useState([])
+  const [savingTiers, setSavingTiers]                             = useState(false)
+  const [tierSaveError, setTierSaveError]                         = useState('')
   const [showRobotPicker, setShowRobotPicker]                     = useState(false)
   const [showStatsResetWarning, setShowStatsResetWarning]         = useState(false)
   const [pendingSavePayload, setPendingSavePayload]               = useState(null)
   const [originalContent, setOriginalContent]                     = useState('')
-  const [originalRequiredRobotIds, setOriginalRequiredRobotIds]   = useState([])
   const [hasExistingBattles, setHasExistingBattles]               = useState(false)
 
   useEffect(() => {
@@ -206,9 +218,8 @@ export default function ScriptEditor() {
         setBlocks(scriptToBlocks(script.content || ''))
         setTextContent(script.content || '')
         setMode('blocks')
-        setRequiredRobotIds(script.requiredRobotIds || [])
+        setRequiredTiers(script.requiredTiers || [])
         setOriginalContent(script.content || '')
-        setOriginalRequiredRobotIds(script.requiredRobotIds || [])
       })
       .catch(err => console.error('Failed to load script:', err))
   }, [scriptId])
@@ -230,7 +241,6 @@ export default function ScriptEditor() {
       setSavedScript(saved)
       setShowSaveModal(true)
       setOriginalContent(payload.content)
-      setOriginalRequiredRobotIds(payload.requiredRobotIds || [])
     } catch (err) {
       if (err.response?.status === 403) {
         setSaveError("You don't have permission to edit this script.")
@@ -243,20 +253,35 @@ export default function ScriptEditor() {
     }
   }
 
+  async function handleSaveTierRequirements() {
+    if (scriptId) {
+      setSavingTiers(true)
+      setTierSaveError('')
+      try {
+        await updateRequiredTiers(scriptId, selectedTiers)
+        setRequiredTiers(selectedTiers)
+        setShowRobotPicker(false)
+      } catch (err) {
+        setTierSaveError('Failed to save tier requirements. Please try again.')
+      } finally {
+        setSavingTiers(false)
+      }
+    } else {
+      setRequiredTiers(selectedTiers)
+      setShowRobotPicker(false)
+    }
+  }
+
   async function handleSave() {
     const payload = {
       name: scriptName,
       content: currentScriptContent,
-      requiredRobotIds,
+      requiredTiers,
     }
 
     if (scriptId && hasExistingBattles) {
       const contentChanged = payload.content !== originalContent
-      const requirementsChanged = !arraysEqual(
-        [...requiredRobotIds].sort((a, b) => a - b),
-        [...originalRequiredRobotIds].sort((a, b) => a - b)
-      )
-      if (contentChanged || requirementsChanged) {
+      if (contentChanged) {
         setPendingSavePayload(payload)
         setShowStatsResetWarning(true)
         return
@@ -539,7 +564,7 @@ export default function ScriptEditor() {
         </div>
       </div>
 
-      {/* Robot requirements strip */}
+      {/* Tier requirements strip */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '8px 24px',
@@ -551,17 +576,32 @@ export default function ScriptEditor() {
           fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
           letterSpacing: '0.12em', color: '#555577',
         }}>
-          ROBOT REQUIREMENTS
+          TIER REQUIREMENTS
         </span>
-        {requiredRobotIds.length === 0 ? (
+        {requiredTiers.length === 0 ? (
           <span style={{ fontSize: 12, color: '#444466' }}>All robots allowed</span>
         ) : (
-          <span style={{ fontSize: 12, color: '#f97316', fontWeight: 600 }}>
-            ⚙️ {requiredRobotIds.length} robot{requiredRobotIds.length !== 1 ? 's' : ''} required
-          </span>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            {requiredTiers.map(tierKey => {
+              const cfg = TIER_CONFIG.find(c => c.key === tierKey)
+              if (!cfg) return null
+              return (
+                <span key={tierKey} style={{
+                  fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+                  fontWeight: 600,
+                  background: `${cfg.color}26`,
+                  border: `1px solid ${cfg.color}`,
+                  color: cfg.color,
+                  padding: '2px 6px', borderRadius: 4,
+                }}>
+                  {cfg.label}
+                </span>
+              )
+            })}
+          </div>
         )}
         <button
-          onClick={() => setShowRobotPicker(true)}
+          onClick={() => { setSelectedTiers(requiredTiers); setTierSaveError(''); setShowRobotPicker(true) }}
           style={{
             padding: '4px 12px',
             background: 'rgba(255,255,255,0.04)',
@@ -573,7 +613,7 @@ export default function ScriptEditor() {
           onMouseEnter={e => { e.currentTarget.style.color = '#f0f0ff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
           onMouseLeave={e => { e.currentTarget.style.color = '#8888aa'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
         >
-          {requiredRobotIds.length === 0 ? '+ Set Requirements' : '✏️ Edit Requirements'}
+          {requiredTiers.length === 0 ? '+ Set Tier Requirements' : '✏️ Edit Tier Requirements'}
         </button>
       </div>
 
@@ -675,7 +715,7 @@ export default function ScriptEditor() {
         width="480px"
       >
         <p style={{ color: '#ccc', marginBottom: 16, fontSize: 14, lineHeight: 1.6, margin: '0 0 16px' }}>
-          You've changed this script's content or robot requirements. Saving will reset its difficulty rating and battle statistics.
+          You've changed this script's content. Saving will reset its difficulty rating and battle statistics.
         </p>
         <p style={{ color: '#8888aa', fontSize: 13, marginBottom: 24, lineHeight: 1.5, margin: '0 0 24px' }}>
           Your battle history will be preserved but won't count toward the new difficulty rating.
@@ -713,38 +753,77 @@ export default function ScriptEditor() {
       <Modal
         isOpen={showRobotPicker}
         onClose={() => setShowRobotPicker(false)}
-        title="Set Robot Requirements"
-        width="860px"
+        title="Set Tier Requirements"
+        width="520px"
       >
-        <p style={{ color: '#8888aa', marginBottom: 16, fontSize: 13, lineHeight: 1.5, margin: '0 0 16px' }}>
-          Select which robots can be used when challenging this script. Leave empty to allow all robots.
+        <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.5, margin: '0 0 20px' }}>
+          Restrict which robot tiers can use this script. Leave all unselected to allow any robot.
         </p>
-        <RobotMultiSelectPicker
-          selectedRobotIds={requiredRobotIds}
-          onChange={setRequiredRobotIds}
-        />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20, gap: 12 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          {TIER_CONFIG.map(({ key, label, color }) => {
+            const isSelected = selectedTiers.includes(key)
+            return (
+              <button
+                key={key}
+                onClick={() => setSelectedTiers(prev =>
+                  prev.includes(key) ? prev.filter(t => t !== key) : [...prev, key]
+                )}
+                style={{
+                  minWidth: 90, padding: '10px 20px', borderRadius: 8,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 13, fontWeight: isSelected ? 700 : 400,
+                  transition: '0.15s all ease',
+                  background: isSelected ? `${color}33` : '#1a1a1a',
+                  border: `1px solid ${isSelected ? color : '#333'}`,
+                  color: isSelected ? color : '#666',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ marginBottom: 20, minHeight: 20 }}>
+          {selectedTiers.length === 0 ? (
+            <span style={{ color: '#666', fontStyle: 'italic', fontSize: 13 }}>All robots allowed</span>
+          ) : (
+            <span style={{ color: '#ff6600', fontSize: 13 }}>
+              {buildTierStatusText(selectedTiers)}
+            </span>
+          )}
+        </div>
+        {tierSaveError && (
+          <div style={{
+            color: '#ff6b6b', fontSize: 12, marginBottom: 12,
+            padding: '8px 12px', background: 'rgba(255,107,107,0.08)',
+            border: '1px solid rgba(255,107,107,0.2)', borderRadius: 6,
+          }}>
+            {tierSaveError}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button
-            onClick={() => setRequiredRobotIds([])}
+            onClick={() => setSelectedTiers([])}
             style={{
-              padding: '9px 18px', borderRadius: 8, fontSize: 13,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#8888aa', cursor: 'pointer', fontFamily: 'inherit',
+              background: 'none', border: 'none',
+              color: '#666', fontSize: 13, cursor: 'pointer',
+              fontFamily: 'inherit', padding: '9px 0',
             }}
           >
             Clear All
           </button>
           <button
-            onClick={() => setShowRobotPicker(false)}
+            onClick={handleSaveTierRequirements}
+            disabled={savingTiers}
             style={{
-              padding: '9px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-              background: 'linear-gradient(135deg, #f97316, #ea580c)',
-              border: 'none', color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
-              boxShadow: '0 4px 16px rgba(249,115,22,0.3)',
+              padding: '9px 24px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+              background: savingTiers ? 'rgba(255,102,0,0.5)' : '#ff6600',
+              border: 'none', color: '#fff',
+              cursor: savingTiers ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
             }}
           >
-            Done
+            {savingTiers ? 'Saving...' : 'Save'}
           </button>
         </div>
       </Modal>

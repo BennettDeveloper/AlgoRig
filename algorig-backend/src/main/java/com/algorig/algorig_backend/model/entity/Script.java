@@ -5,8 +5,9 @@ import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 @Entity
 @Table(name = "scripts")
@@ -43,15 +44,13 @@ public class Script {
     @Column(name = "featured_order")
     private Integer featuredOrder;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "script_required_robots",
-        joinColumns = @JoinColumn(name = "script_id"),
-        inverseJoinColumns = @JoinColumn(name = "robot_id")
-    )
-    @Builder.Default
-    @ToString.Exclude
-    private Set<Robot> requiredRobots = new HashSet<>();
+    @Column(name = "required_tiers", columnDefinition = "TEXT")
+    private String requiredTiers;
+
+    public List<String> getRequiredTiersList() {
+        if (requiredTiers == null || requiredTiers.isBlank()) return Collections.emptyList();
+        return Arrays.asList(requiredTiers.split(","));
+    }
 
     @PrePersist
     protected void onCreate() {

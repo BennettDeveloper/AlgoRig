@@ -144,7 +144,7 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
               AND (:authorUsername IS NULL OR :authorUsername = ''
                    OR LOWER(o.username) = LOWER(:authorUsername))
               AND (COALESCE(ss.totalBattles, 0) >= :minBattles)
-              AND (:requirementsOnly = false OR s.requiredRobots IS NOT EMPTY)
+              AND (:requirementsOnly = false OR (s.requiredTiers IS NOT NULL AND s.requiredTiers != ''))
             ORDER BY COALESCE(ss.timesUsed, 0) DESC, s.createdAt DESC
             """,
             countQuery = """
@@ -158,7 +158,7 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
               AND (:authorUsername IS NULL OR :authorUsername = ''
                    OR LOWER(o.username) = LOWER(:authorUsername))
               AND (COALESCE(ss.totalBattles, 0) >= :minBattles)
-              AND (:requirementsOnly = false OR s.requiredRobots IS NOT EMPTY)
+              AND (:requirementsOnly = false OR (s.requiredTiers IS NOT NULL AND s.requiredTiers != ''))
             """)
     Page<Script> findPublicScriptsSortByMostUsedFiltered(
             @Param("search") String search,
@@ -178,7 +178,7 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
               AND (:authorUsername IS NULL OR :authorUsername = ''
                    OR LOWER(o.username) = LOWER(:authorUsername))
               AND (COALESCE(ss.totalBattles, 0) >= :minBattles)
-              AND (:requirementsOnly = false OR s.requiredRobots IS NOT EMPTY)
+              AND (:requirementsOnly = false OR (s.requiredTiers IS NOT NULL AND s.requiredTiers != ''))
             ORDER BY COALESCE(ss.winRate, 0) DESC, s.createdAt DESC
             """,
             countQuery = """
@@ -192,7 +192,7 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
               AND (:authorUsername IS NULL OR :authorUsername = ''
                    OR LOWER(o.username) = LOWER(:authorUsername))
               AND (COALESCE(ss.totalBattles, 0) >= :minBattles)
-              AND (:requirementsOnly = false OR s.requiredRobots IS NOT EMPTY)
+              AND (:requirementsOnly = false OR (s.requiredTiers IS NOT NULL AND s.requiredTiers != ''))
             """)
     Page<Script> findPublicScriptsSortByWinRateFiltered(
             @Param("search") String search,
@@ -212,7 +212,7 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
               AND (:authorUsername IS NULL OR :authorUsername = ''
                    OR LOWER(o.username) = LOWER(:authorUsername))
               AND (COALESCE(ss.totalBattles, 0) >= :minBattles)
-              AND (:requirementsOnly = false OR s.requiredRobots IS NOT EMPTY)
+              AND (:requirementsOnly = false OR (s.requiredTiers IS NOT NULL AND s.requiredTiers != ''))
             ORDER BY s.createdAt DESC
             """,
             countQuery = """
@@ -226,7 +226,7 @@ public interface ScriptRepository extends JpaRepository<Script, Long> {
               AND (:authorUsername IS NULL OR :authorUsername = ''
                    OR LOWER(o.username) = LOWER(:authorUsername))
               AND (COALESCE(ss.totalBattles, 0) >= :minBattles)
-              AND (:requirementsOnly = false OR s.requiredRobots IS NOT EMPTY)
+              AND (:requirementsOnly = false OR (s.requiredTiers IS NOT NULL AND s.requiredTiers != ''))
             """)
     Page<Script> findPublicScriptsSortByNewestFiltered(
             @Param("search") String search,

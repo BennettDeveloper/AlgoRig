@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import RobotScene from '../three/RobotScene'
+import PickerRobotView from '../three/PickerRobotView'
 
 const tierColors = {
   1: '#6b7280',
@@ -77,7 +79,6 @@ function PassiveTooltip({ passive, displayName, x, y }) {
   const color = PASSIVE_COLORS[data.type] || '#8888aa'
   const typeLabel = data.type.toUpperCase()
 
-  // Keep tooltip in viewport
   const left = Math.min(x + 16, window.innerWidth - 300)
   const top  = Math.max(8, Math.min(y - 8, window.innerHeight - 200))
 
@@ -96,7 +97,6 @@ function PassiveTooltip({ passive, displayName, x, y }) {
       fontFamily: 'JetBrains Mono, monospace',
       animation: 'tooltipFadeIn 0.15s ease-out',
     }}>
-      {/* Header */}
       <div style={{
         fontSize: 9, color: '#555577', letterSpacing: '0.2em',
         textTransform: 'uppercase', marginBottom: 6,
@@ -112,7 +112,6 @@ function PassiveTooltip({ passive, displayName, x, y }) {
         PASSIVE ABILITY
       </div>
 
-      {/* Name */}
       <div style={{
         fontSize: 16, fontWeight: 700, color: '#f0f0ff',
         marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8,
@@ -122,14 +121,10 @@ function PassiveTooltip({ passive, displayName, x, y }) {
         <span style={{ color }}>{displayName}</span>
       </div>
 
-      {/* Short description */}
-      <div style={{
-        fontSize: 13, color: '#c0c0d8', lineHeight: 1.45, marginBottom: 8,
-      }}>
+      <div style={{ fontSize: 13, color: '#c0c0d8', lineHeight: 1.45, marginBottom: 8 }}>
         {data.shortDesc}
       </div>
 
-      {/* Detail */}
       <div style={{
         fontSize: 11, color: '#666688', fontStyle: 'italic', lineHeight: 1.4,
         borderTop: `1px solid ${color}18`, paddingTop: 7,
@@ -142,7 +137,7 @@ function PassiveTooltip({ passive, displayName, x, y }) {
 
 // ── RobotCard ─────────────────────────────────────────────────────────────────
 
-export default function RobotCard({ robot, onClick, disabled = false, selected = false, disabledReason = null }) {
+export default function RobotCard({ robot, onClick, disabled = false, selected = false, disabledReason = null, pickerMode = false }) {
   const [hovered, setHovered] = useState(false)
   const [tooltipVisible, setTooltipVisible] = useState(false)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
@@ -154,6 +149,20 @@ export default function RobotCard({ robot, onClick, disabled = false, selected =
   const passiveColor = passiveData ? PASSIVE_COLORS[passiveData.type] : '#555577'
 
   useEffect(() => () => clearTimeout(timerRef.current), [])
+
+  // robot.tier is numeric (1–5) in both preset and normalised custom robots
+  const sceneRobot = {
+    name:             robot.name,
+    tier:             `TIER_${robot.tier}`,
+    hp:               robot.systemIntegrity || 100,
+    coreImpact:       robot.coreImpact       || 0,
+    exploitPower:     robot.exploitPower     || 0,
+    clockSpeed:       robot.clockSpeed       || 0,
+    chassisArmor:     robot.chassisArmor     || 0,
+    firewallStrength: robot.firewallStrength  || 0,
+    battery:          robot.battery          || 0,
+    partsConfig:      robot.partsConfig      || null,
+  }
 
   function handleMouseEnter(e) {
     setHovered(true)
@@ -198,6 +207,7 @@ export default function RobotCard({ robot, onClick, disabled = false, selected =
           position: 'relative',
           opacity: disabled ? 0.35 : 1,
           pointerEvents: disabled ? 'none' : 'auto',
+          overflow: 'hidden',
         }}
       >
         {selected && (
@@ -207,61 +217,97 @@ export default function RobotCard({ robot, onClick, disabled = false, selected =
             background: '#f97316',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 10, fontWeight: 700, color: '#fff',
-            zIndex: 1,
+            zIndex: 2,
           }}>
             ✓
           </div>
         )}
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 18 }}>
-          <div style={{
-            fontSize: 32,
-            lineHeight: 1,
-            filter: `drop-shadow(0 0 10px ${tierColor}80)`,
-            flexShrink: 0,
-          }}>
-            🤖
-          </div>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: 16,
+        {/* Robot 3D preview — full-bleed hero zone */}
+        <div
+          style={{
+            margin: '-20px -20px 0 -20px',
+            height: pickerMode ? 130 : 160,
+            borderRadius: '14px 14px 0 0',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            background: 'rgba(0,0,0,0.25)',
+            flexShrink: 0,
+            ...(pickerMode && { display: 'flex', alignItems: 'center', justifyContent: 'center' }),
+          }}
+        >
+          {pickerMode ? (
+            <PickerRobotView
+              robot={sceneRobot}
+              width={120}
+              height={130}
+            />
+          ) : (
+            <RobotScene
+              robot={sceneRobot}
+              animationState="idle"
+              side="left"
+              width="100%"
+              height={160}
+              interactive={false}
+            />
+          )}
+        </div>
+
+        {/* Name + tier + spec row */}
+        <div style={{ marginTop: 14, marginBottom: 18 }}>
+          <div style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: '#f0f0ff',
+            marginBottom: 6,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {robot.name}
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{
+              background: `${tierColor}20`,
+              border: `1px solid ${tierColor}50`,
+              borderRadius: 4,
+              padding: '2px 7px',
+              color: tierColor,
+              fontSize: 10,
+              fontFamily: 'JetBrains Mono, monospace',
               fontWeight: 700,
-              color: '#f0f0ff',
-              marginBottom: 6,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              letterSpacing: '0.1em',
             }}>
-              {robot.name}
-            </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              TIER {robot.tier}
+            </span>
+            {robot.isCustom && (
               <span style={{
-                background: `${tierColor}20`,
-                border: `1px solid ${tierColor}50`,
+                background: 'rgba(249,115,22,0.15)',
+                border: '1px solid rgba(249,115,22,0.4)',
                 borderRadius: 4,
                 padding: '2px 7px',
-                color: tierColor,
+                color: '#f97316',
                 fontSize: 10,
                 fontFamily: 'JetBrains Mono, monospace',
                 fontWeight: 700,
                 letterSpacing: '0.1em',
               }}>
-                TIER {robot.tier}
+                CUSTOM
               </span>
-              <span style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 4,
-                padding: '2px 7px',
-                color: '#8888aa',
-                fontSize: 10,
-                fontFamily: 'JetBrains Mono, monospace',
-                letterSpacing: '0.08em',
-              }}>
-                {spec}
-              </span>
-            </div>
+            )}
+            <span style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 4,
+              padding: '2px 7px',
+              color: '#8888aa',
+              fontSize: 10,
+              fontFamily: 'JetBrains Mono, monospace',
+              letterSpacing: '0.08em',
+            }}>
+              {spec}
+            </span>
           </div>
         </div>
 

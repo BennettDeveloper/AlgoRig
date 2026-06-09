@@ -19,6 +19,7 @@ const Profile        = lazy(() => import('./pages/Profile'))
 const Repository     = lazy(() => import('./pages/Repository'))
 const ScriptDetail   = lazy(() => import('./pages/ScriptDetail'))
 const Leaderboard    = lazy(() => import('./pages/Leaderboard'))
+const RobotBuilder   = lazy(() => import('./pages/RobotBuilder'))
 
 const LoadingFallback = () => (
   <div style={{
@@ -48,6 +49,8 @@ function App() {
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
+        {/* // <Route path="/three-test" element={<ThreeTestPage />} /> */}
+
         {/* Auth pages — full-screen, no Layout wrapper */}
         <Route path="/login" element={
           <PublicOnlyRoute><Login /></PublicOnlyRoute>
@@ -65,6 +68,10 @@ function App() {
           <Route path="profile/:username" element={<Profile />} />
           <Route path="repository" element={<Repository />} />
           <Route path="repository/:id" element={<ScriptDetail />} />
+
+          <Route path="robot-builder" element={
+            <ProtectedRoute><RobotBuilder /></ProtectedRoute>
+          } />
 
           {/* Protected routes */}
           <Route path="scripts" element={

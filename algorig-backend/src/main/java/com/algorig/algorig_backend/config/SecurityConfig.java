@@ -63,6 +63,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/users/{username}").permitAll()
                 // Public script repository — no auth required
                 .requestMatchers(HttpMethod.GET, "/api/repository/**").permitAll()
+                // Leaderboard — fully public
+                .requestMatchers("/api/leaderboard/**").permitAll()
                 // OAuth2 flow
                 .requestMatchers("/oauth2/**").permitAll()
                 .requestMatchers("/login/oauth2/**").permitAll()

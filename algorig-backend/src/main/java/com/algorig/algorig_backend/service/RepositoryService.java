@@ -16,9 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -83,22 +81,8 @@ public class RepositoryService {
                 .isPublic(script.isPublic())
                 .stats(stats)
                 .versionHistory(versionHistory)
+                .requiredTiers(script.getRequiredTiersList())
                 .build();
-
-        List<Long> requiredRobotIds = script.getRequiredRobots()
-                .stream()
-                .map(Robot::getId)
-                .sorted()
-                .collect(Collectors.toList());
-        dto.setRequiredRobotIds(requiredRobotIds);
-        dto.setHasRequirements(!requiredRobotIds.isEmpty());
-
-        List<RobotDto> requiredRobotDtos = script.getRequiredRobots()
-                .stream()
-                .sorted(Comparator.comparing(Robot::getTier).thenComparing(Robot::getName))
-                .map(this::toRobotDto)
-                .collect(Collectors.toList());
-        dto.setRequiredRobots(requiredRobotDtos);
 
         return dto;
     }
@@ -124,7 +108,7 @@ public class RepositoryService {
             preview = preview.substring(0, cutoff > 0 ? cutoff : 120) + "...";
         }
 
-        ScriptSummaryDto dto = ScriptSummaryDto.builder()
+        return ScriptSummaryDto.builder()
                 .id(script.getId())
                 .name(script.getName())
                 .contentPreview(preview)
@@ -136,16 +120,8 @@ public class RepositoryService {
                 .ownerAvatarUrl(script.getOwner() != null ? script.getOwner().getAvatarUrl() : null)
                 .isPublic(script.isPublic())
                 .stats(scriptStatsService.getStatsDtoForScript(script))
+                .requiredTiers(script.getRequiredTiersList())
                 .build();
-
-        List<Long> requiredRobotIds = script.getRequiredRobots()
-                .stream()
-                .map(Robot::getId)
-                .sorted()
-                .collect(Collectors.toList());
-        dto.setRequiredRobotIds(requiredRobotIds);
-        dto.setHasRequirements(!requiredRobotIds.isEmpty());
-        return dto;
     }
 
     private BattleDto toBattleDto(Battle battle) {

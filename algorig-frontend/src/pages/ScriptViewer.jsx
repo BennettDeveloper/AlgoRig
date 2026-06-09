@@ -227,16 +227,23 @@ function ScriptPreview({ script, onEdit }) {
               v{script.version}
             </span>
             <span style={{ fontSize: 12, color: '#444466' }}>Last updated {date}</span>
-            {script.hasRequirements && (
-              <span style={{
-                fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
-                color: '#f97316', background: 'rgba(249,115,22,0.08)',
-                border: '1px solid rgba(249,115,22,0.25)',
-                borderRadius: 4, padding: '2px 8px',
-              }}>
-                ⚙️ {script.requiredRobotIds?.length ?? 0} robot{(script.requiredRobotIds?.length ?? 0) !== 1 ? 's' : ''} required
-              </span>
-            )}
+            {script.requiredTiers?.length > 0 && script.requiredTiers.map(tierKey => {
+              const tierNum = parseInt(tierKey.replace('TIER_', ''), 10)
+              const tierColors = { 1: '#a1a5b4', 2: '#22c55e', 3: '#3b82f6', 4: '#7c3aed', 5: '#facc15' }
+              const color = tierColors[tierNum] || '#6b7280'
+              return (
+                <span key={tierKey} style={{
+                  fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+                  fontWeight: 600,
+                  background: `${color}26`,
+                  border: `1px solid ${color}`,
+                  color,
+                  borderRadius: 4, padding: '2px 8px',
+                }}>
+                  T{tierNum}
+                </span>
+              )
+            })}
           </div>
         </div>
         <button

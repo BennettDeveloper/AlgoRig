@@ -23,6 +23,5 @@ public class ScriptDto {
     @JsonProperty("isPublic")
     private boolean isPublic;
     private Integer featuredOrder;
-    private List<Long> requiredRobotIds;
-    private boolean hasRequirements;
+    private List<String> requiredTiers;
 }

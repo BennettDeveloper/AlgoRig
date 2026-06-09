@@ -23,6 +23,14 @@ public class Battle {
     private Long robotAId;
     private Long robotBId;
 
+    @Column(name = "robot_a_type", length = 10, nullable = false)
+    @Builder.Default
+    private String robotAType = "PRESET";
+
+    @Column(name = "robot_b_type", length = 10, nullable = false)
+    @Builder.Default
+    private String robotBType = "PRESET";
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "script_a_id")
     @ToString.Exclude

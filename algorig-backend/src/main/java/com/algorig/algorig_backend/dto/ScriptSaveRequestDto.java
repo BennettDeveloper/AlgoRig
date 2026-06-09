@@ -13,5 +13,5 @@ public class ScriptSaveRequestDto {
 
     private String name;
     private String content;
-    private List<Long> requiredRobotIds;
+    private List<String> requiredTiers;
 }

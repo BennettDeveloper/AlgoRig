@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/scripts")
@@ -47,6 +48,12 @@ public class ScriptController {
     public ScriptDto updateScript(@PathVariable Long id, @RequestBody ScriptSaveRequestDto request) {
         User user = AuthUtil.getCurrentUser();
         return scriptService.updateScript(id, request, user);
+    }
+
+    @PutMapping("/{id}/required-tiers")
+    public ScriptDto updateRequiredTiers(@PathVariable Long id, @RequestBody Map<String, List<String>> body) {
+        User user = AuthUtil.getCurrentUser();
+        return scriptService.updateRequiredTiers(id, body.get("tiers"), user);
     }
 
     @PostMapping("/validate")

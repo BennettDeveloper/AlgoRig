@@ -12,6 +12,7 @@ const publicLinks = [
 const authedLinks = [
   { to: '/', label: 'Dashboard' },
   { to: '/robots', label: 'Robots' },
+  { to: '/robot-builder', label: 'Builder' },
   { to: '/repository', label: 'Repository' },
   { to: '/scripts', label: 'Scripts' },
   { to: '/battles', label: 'Battles' },

@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import client from '../api/client'
 import { startBattle } from '../api/battles'
 import { getScripts } from '../api/scripts'
+import { getMyRobots } from '../api/customRobotApi'
+import { getPassiveName } from '../constants/robotConstants'
 import RobotCard from '../components/robots/RobotCard'
+import PickerRobotCanvas from '../components/three/PickerRobotCanvas'
 import ErrorModal from '../components/ErrorModal'
 
 const tierColors = {
@@ -14,16 +17,35 @@ const tierColors = {
   5: '#f97316',
 }
 
+function buildRequiredTierText(tiers) {
+  const sorted = [...tiers].sort()
+  const labels = sorted.map(t => `Tier ${t.replace('TIER_', '')}`)
+  if (labels.length === 1) return labels[0]
+  return `${labels.slice(0, -1).join(', ')} or ${labels[labels.length - 1]}`
+}
+
 function getSpecialization(robot) {
   if (!robot) return null
   const stats = {
-    ATTACKER: robot.coreImpact,
-    DEFENDER: robot.chassisArmor,
-    SPEEDSTER: robot.clockSpeed,
-    HACKER: robot.exploitPower,
-    HEALER: robot.recovery,
+    ATTACKER: robot.coreImpact      || 0,
+    DEFENDER: robot.chassisArmor    || 0,
+    SPEEDSTER: robot.clockSpeed     || 0,
+    HACKER: robot.exploitPower      || 0,
+    HEALER: robot.recovery          || 0,
   }
   return Object.entries(stats).sort((a, b) => b[1] - a[1])[0][0]
+}
+
+function normalizeCustomRobot(cr) {
+  const tierNum = parseInt(cr.tier.replace('TIER_', ''), 10)
+  return {
+    ...cr,
+    tier:               tierNum,
+    type:               'CUSTOM',
+    isCustom:           true,
+    systemIntegrity:    cr.hp,
+    passiveDisplayName: getPassiveName(cr.passiveAbility),
+  }
 }
 
 function StepIndicator({ current }) {
@@ -111,8 +133,10 @@ export default function BattleLauncher() {
     Promise.all([
       client.get('/robots'),
       getScripts(),
-    ]).then(([robotsRes, scriptsData]) => {
-      setRobots(robotsRes.data)
+      getMyRobots().catch(() => []),
+    ]).then(([robotsRes, scriptsData, customData]) => {
+      const customRobots = (Array.isArray(customData) ? customData : []).map(normalizeCustomRobot)
+      setRobots([...robotsRes.data, ...customRobots])
       setScripts(scriptsData)
     }).finally(() => setLoading(false))
   }, [])
@@ -142,12 +166,16 @@ export default function BattleLauncher() {
     setError(null)
     try {
       const payload = {
-        robotAId: robotA.id,
-        robotBId: robotB.id,
-        scriptAId: scriptA.id,
-        scriptBId: sameScript ? scriptA.id : (challengeScript ? challengeScript.id : scriptB?.id),
+        robotAId:           robotA.isCustom ? undefined : robotA.id,
+        robotBId:           robotB.isCustom ? undefined : robotB.id,
+        scriptAId:          scriptA.id,
+        scriptBId:          sameScript ? scriptA.id : (challengeScript ? challengeScript.id : scriptB?.id),
         tierCap,
         maxTurns,
+        userRobotType:      robotA.isCustom ? 'CUSTOM' : 'PRESET',
+        enemyRobotType:     robotB.isCustom ? 'CUSTOM' : 'PRESET',
+        userCustomRobotId:  robotA.isCustom ? robotA.id : undefined,
+        enemyCustomRobotId: robotB.isCustom ? robotB.id : undefined,
       }
       const res = await startBattle(payload)
       navigate(`/battles/${res.battleCode}`)
@@ -163,6 +191,14 @@ export default function BattleLauncher() {
 
   const canProceedStep1 = Boolean(robotA && robotB)
   const canProceedStep2 = Boolean(scriptA && (sameScript || scriptB || challengeScript))
+
+  // Tier requirements for whichever slot the picker is currently open for
+  const activeScript = pickingSlot === 'A' ? scriptA : (challengeScript ?? scriptB)
+  const activeReqTiers = activeScript?.requiredTiers || []
+  const pickerSelectedRobot = pickingSlot === 'A' ? robotA : pickingSlot === 'B' ? robotB : null
+  const pickerSelectedViolatesReq = activeReqTiers.length > 0 &&
+    pickerSelectedRobot != null &&
+    !activeReqTiers.includes(`TIER_${pickerSelectedRobot.tier}`)
 
   const backBtnStyle = {
     padding: '10px 20px', borderRadius: 8, fontSize: 13, fontFamily: 'inherit',
@@ -497,9 +533,11 @@ export default function BattleLauncher() {
           {/* Robot picker panel */}
           {pickingSlot && (
             <div style={{
+              position: 'relative', overflow: 'hidden',
               background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 14, padding: 20, marginBottom: 24,
             }}>
+              <PickerRobotCanvas />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                 <span style={{
                   fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.12em',
@@ -531,14 +569,19 @@ export default function BattleLauncher() {
                 </button>
               </div>
 
-              {pickingSlot === 'B' && challengeScript?.requiredRobotIds?.length > 0 && (
+              {activeReqTiers.length > 0 && (
                 <div style={{
                   background: 'rgba(249,115,22,0.06)',
                   border: '1px solid rgba(249,115,22,0.3)',
-                  borderRadius: 6, padding: '8px 12px',
+                  borderRadius: 8, padding: '8px 12px',
                   marginBottom: 12, fontSize: 12, color: '#f97316',
                 }}>
-                  ⚙️ This script has robot requirements. Only compatible robots are selectable.
+                  ⚠ This script requires {buildRequiredTierText(activeReqTiers)} robots only.
+                  {pickerSelectedViolatesReq && (
+                    <span style={{ display: 'block', marginTop: 4 }}>
+                      Your current selection doesn't qualify — please choose a different robot.
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -556,16 +599,52 @@ export default function BattleLauncher() {
                 }}>
                   {pickerRobots.map(robot => {
                     const isOther = (pickingSlot === 'A' ? robotB : robotA)?.id === robot.id
-                    const reqIds = pickingSlot === 'B' ? challengeScript?.requiredRobotIds : null
-                    const reqBlocked = reqIds?.length > 0 && !reqIds.map(Number).includes(Number(robot.id))
+                    const tierBlocked = activeReqTiers.length > 0 &&
+                      !activeReqTiers.includes(`TIER_${robot.tier}`)
                     return (
-                      <div key={robot.id} style={{ opacity: isOther ? 0.25 : 1, pointerEvents: isOther ? 'none' : 'auto' }}>
-                        <RobotCard
-                          robot={robot}
-                          onClick={() => selectRobot(robot)}
-                          disabled={reqBlocked}
-                          disabledReason={reqBlocked ? 'This script requires specific robots' : null}
-                        />
+                      <div
+                        key={robot.id}
+                        style={{
+                          position: 'relative',
+                          opacity: isOther ? 0.25 : tierBlocked ? 0.3 : 1,
+                          pointerEvents: isOther ? 'none' : 'auto',
+                          cursor: tierBlocked ? 'not-allowed' : 'pointer',
+                          userSelect: tierBlocked ? 'none' : 'auto',
+                          transition: 'opacity 0.15s ease',
+                        }}
+                      >
+                        <div style={{ pointerEvents: tierBlocked ? 'none' : 'auto' }}>
+                          <RobotCard
+                            robot={robot}
+                            onClick={() => selectRobot(robot)}
+                            pickerMode={true}
+                          />
+                        </div>
+                        {tierBlocked && (
+                          <>
+                            <div style={{
+                              position: 'absolute', inset: 0, zIndex: 10,
+                              cursor: 'not-allowed',
+                              borderRadius: 'inherit',
+                              background: 'rgba(0,0,0,0.01)',
+                            }} />
+                            <div style={{
+                              position: 'absolute', inset: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              borderRadius: 'inherit',
+                              background: 'rgba(0,0,0,0.5)',
+                              pointerEvents: 'none',
+                            }}>
+                              <span style={{
+                                color: '#666', fontSize: 11,
+                                letterSpacing: 2, fontFamily: 'monospace',
+                                textTransform: 'uppercase',
+                              }}>
+                                WRONG TIER
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )
                   })}

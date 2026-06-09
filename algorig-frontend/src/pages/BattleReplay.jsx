@@ -3,13 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getBattle } from '../api/battles'
 import Modal from '../components/ui/Modal'
 import { useToast } from '../context/ToastContext'
-import { RobotSVGA, RobotSVGB } from '../components/replay/RobotSVG'
+import BattleScene from '../components/three/BattleScene'
 import FlashingStatBar from '../components/replay/FlashingStatBar'
 import FloatingNumber from '../components/replay/FloatingNumber'
-import ArenaEffects from '../components/replay/ArenaEffects'
-import ArenaBackground from '../components/replay/ArenaBackground'
 import useReplayEngine from '../components/replay/useReplayEngine'
-import useRobotAnimation from '../components/replay/useRobotAnimation'
+
 
 const PHYSICAL_ACTIONS  = new Set(['HARD_STRIKE', 'HEAVY_ATTACK'])
 const SOFTWARE_ACTIONS  = new Set(['POWER_SURGE', 'VIRUS_UPLOAD'])
@@ -27,6 +25,24 @@ function actionColor(action) {
   if (HEALING_ACTIONS.has(action))   return '#22c55e'
   if (SUPPORT_ACTIONS.has(action))   return '#22d3ee'
   return '#38bdf8'
+}
+
+function getBattleAnimState(entry, isRobotA) {
+  if (!entry) return 'idle'
+  const PHYSICAL     = ['HARD_STRIKE', 'HEAVY_ATTACK']
+  const SOFTWARE     = ['POWER_SURGE', 'VIRUS_UPLOAD', 'STACK_OVERFLOW']
+  const SHIELD       = ['FIREWALL', 'ARMOR_PLATE']
+  const PATCH_ACTS   = ['PATCH']
+  const action = (entry.actionTaken || '').toUpperCase().replace(/ /g, '_')
+  const isActor = isRobotA ? entry.actor === 'A' : entry.actor === 'B'
+  if (isActor) {
+    if (PHYSICAL.includes(action))   return 'physicalAttack'
+    if (SOFTWARE.includes(action))   return 'softwareAttack'
+    if (SHIELD.includes(action))     return 'shieldEffect'
+    if (PATCH_ACTS.includes(action)) return 'patchEffect'
+    return 'statusEffect'
+  }
+  return (entry.damageDealt ?? 0) > 0 ? 'hit' : 'idle'
 }
 
 function TurnHeader({ entry, robotA, robotB }) {
@@ -68,7 +84,7 @@ function TurnHeader({ entry, robotA, robotB }) {
 
   return (
     <div style={{
-      flexShrink: 0,
+      position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, pointerEvents: 'none',
       background: isA ? bgA : bgB,
       borderBottom: `2px solid ${accent}44`,
       padding: '10px 20px',
@@ -248,9 +264,29 @@ export default function BattleReplay() {
   const deadA = displayHpA <= 0
   const deadB = displayHpB <= 0
 
-  const { attackerStyle, defenderStyle } = useRobotAnimation(currentEvent, speed)
-  const robotAAnimStyle = actingA ? attackerStyle : actingB ? defenderStyle : {}
-  const robotBAnimStyle = actingB ? attackerStyle : actingA ? defenderStyle : {}
+  const robotAForScene = battle?.robotA ? {
+    name: battle.robotA.name,
+    tier: `TIER_${battle.robotA.tier}`,
+    hp: battle.robotA.systemIntegrity || 100,
+    coreImpact: battle.robotA.coreImpact || 0,
+    exploitPower: battle.robotA.exploitPower || 0,
+    clockSpeed: battle.robotA.clockSpeed || 0,
+    chassisArmor: battle.robotA.chassisArmor || 0,
+    firewallStrength: battle.robotA.firewallStrength || 0,
+    battery: battle.robotA.battery || 0,
+  } : null
+
+  const robotBForScene = battle?.robotB ? {
+    name: battle.robotB.name,
+    tier: `TIER_${battle.robotB.tier}`,
+    hp: battle.robotB.systemIntegrity || 100,
+    coreImpact: battle.robotB.coreImpact || 0,
+    exploitPower: battle.robotB.exploitPower || 0,
+    clockSpeed: battle.robotB.clockSpeed || 0,
+    chassisArmor: battle.robotB.chassisArmor || 0,
+    firewallStrength: battle.robotB.firewallStrength || 0,
+    battery: battle.robotB.battery || 0,
+  } : null
 
   // Screen shake on heavy physical hits and Stack Overflow
   const [shakeKey, setShakeKey] = useState(null)
@@ -491,107 +527,74 @@ export default function BattleReplay() {
         </div>
 
         {/* Center — Arena */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'visible', position: 'relative' }}>
 
           <TurnHeader entry={currentEvent} robotA={battle?.robotA} robotB={battle?.robotB} />
 
-          {/* Arena visual */}
+          {/* Robot display — single shared canvas */}
           <div
             key={shakeKey}
             style={{
-              flex: '0 0 310px', position: 'relative', overflow: 'hidden',
-              animation: shakeKey ? `screenShake 220ms ease-out` : 'none',
+              width: '100%',
+              height: 300,
+              position: 'relative',
+              zIndex: 10,
+              marginBottom: 0,
+              animation: shakeKey ? 'screenShake 220ms ease-out' : 'none',
             }}
           >
+            <BattleScene
+              robotA={robotAForScene}
+              robotB={robotBForScene}
+              animStateA={getBattleAnimState(currentEvent, true)}
+              animStateB={getBattleAnimState(currentEvent, false)}
+              width="100%"
+              height={300}
+            />
 
-            <ArenaBackground currentEntry={currentEvent} />
-
-            {/* Robot A — left */}
+            {/* IDLE / ACTING labels */}
             <div style={{
-              position: 'absolute', left: '12%', top: '50%',
-              transform: 'translateY(-60%)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+              position: 'absolute',
+              bottom: 8,
+              left: '18%',
+              fontSize: 11,
+              letterSpacing: 3,
+              color: '#555',
+              pointerEvents: 'none'
             }}>
-              <div key={`a-${currentIndex}`} style={robotAAnimStyle}>
-                <RobotSVGA
-                  size={120}
-                  isActing={actingA && currentEvent?.entryType === 'ACTION'}
-                  isDead={deadA}
-                  healthPercent={healthPctA}
-                  suppressHealthAnim={!!robotAAnimStyle.animation}
-                />
-              </div>
-              <div style={{
-                fontSize: 11, letterSpacing: '0.2em', fontFamily: 'JetBrains Mono, monospace',
-                color: actingA && currentEvent?.entryType === 'ACTION' ? '#38bdf8' : '#334455',
-                display: 'flex', alignItems: 'center', gap: 6, transition: 'color 0.3s ease',
-              }}>
-                {actingA && currentEvent?.entryType === 'ACTION' && (
-                  <span style={{ color: '#38bdf8' }}>►</span>
-                )}
-                {actingA && currentEvent?.entryType === 'ACTION' ? 'ACTING' : 'IDLE'}
-              </div>
+              {getBattleAnimState(currentEvent, true) !== 'idle' ? '► ACTING' : 'IDLE'}
+            </div>
+            <div style={{
+              position: 'absolute',
+              bottom: 8,
+              right: '18%',
+              fontSize: 11,
+              letterSpacing: 3,
+              color: '#555',
+              pointerEvents: 'none'
+            }}>
+              {getBattleAnimState(currentEvent, false) !== 'idle' ? '► ACTING' : 'IDLE'}
             </div>
 
-            {/* Robot B — right */}
-            <div style={{
-              position: 'absolute', right: '12%', top: '50%',
-              transform: 'translateY(-60%)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-            }}>
-              <div key={`b-${currentIndex}`} style={robotBAnimStyle}>
-                <RobotSVGB
-                  size={120}
-                  isActing={actingB && currentEvent?.entryType === 'ACTION'}
-                  isDead={deadB}
-                  healthPercent={healthPctB}
-                  suppressHealthAnim={!!robotBAnimStyle.animation}
-                />
-              </div>
-              <div style={{
-                fontSize: 11, letterSpacing: '0.2em', fontFamily: 'JetBrains Mono, monospace',
-                color: actingB && currentEvent?.entryType === 'ACTION' ? '#ef4444' : '#443333',
-                display: 'flex', alignItems: 'center', gap: 6, transition: 'color 0.3s ease',
-              }}>
-                {actingB && currentEvent?.entryType === 'ACTION' && (
-                  <span style={{ color: '#ef4444' }}>►</span>
-                )}
-                {actingB && currentEvent?.entryType === 'ACTION' ? 'ACTING' : 'IDLE'}
-              </div>
-            </div>
-
-            {/* Floating numbers — Robot A side */}
-            <div style={{ position: 'absolute', left: '12%', top: '22%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 30 }}>
+            {/* Floating damage/heal/battery numbers */}
+            <div style={{ position: 'absolute', top: 8, left: '22%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 20 }}>
               {showDmgOnA && <FloatingNumber key={`dmg-a-${currentIndex}`} value={currentEvent.damageDealt} type="damage" />}
               {showHealOnA && <FloatingNumber key={`heal-a-${currentIndex}`} value={currentEvent.healingDone} type="heal" />}
               {showBattOnA && <FloatingNumber key={`batt-a-${currentIndex}`} value={currentEvent.batterySpent} type="battery" />}
             </div>
-
-            {/* Floating numbers — Robot B side */}
-            <div style={{ position: 'absolute', right: '12%', top: '22%', transform: 'translateX(50%)', pointerEvents: 'none', zIndex: 30 }}>
+            <div style={{ position: 'absolute', top: 8, left: '78%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 20 }}>
               {showDmgOnB && <FloatingNumber key={`dmg-b-${currentIndex}`} value={currentEvent.damageDealt} type="damage" />}
               {showHealOnB && <FloatingNumber key={`heal-b-${currentIndex}`} value={currentEvent.healingDone} type="heal" />}
               {showBattOnB && <FloatingNumber key={`batt-b-${currentIndex}`} value={currentEvent.batterySpent} type="battery" />}
             </div>
+          </div>
 
-            {/* Event card — center */}
-            <div style={{
-              position: 'absolute', left: '50%', top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 320, maxHeight: 200, overflowY: 'auto', zIndex: 10,
-            }}>
-              {currentEvent
-                ? <EventCard entry={currentEvent} robotA={battle?.robotA} robotB={battle?.robotB} log={log} currentIndex={currentIndex} />
-                : <div style={{ fontSize: 22, fontWeight: 900, color: '#2a2a4a', letterSpacing: 6, textAlign: 'center' }}>VS</div>
-              }
-            </div>
-
-            <ArenaEffects
-              currentEntry={currentEvent}
-              speed={speed}
-              robotAName={battle?.robotA?.name}
-              robotBName={battle?.robotB?.name}
-            />
+          {/* Event card */}
+          <div style={{ padding: '0 8px', maxHeight: 180, overflowY: 'auto', zIndex: 10, flexShrink: 0 }}>
+            {currentEvent
+              ? <EventCard entry={currentEvent} robotA={battle?.robotA} robotB={battle?.robotB} log={log} currentIndex={currentIndex} />
+              : <div style={{ fontSize: 22, fontWeight: 900, color: '#2a2a4a', letterSpacing: 6, textAlign: 'center' }}>VS</div>
+            }
           </div>
 
           {/* Battle log */}

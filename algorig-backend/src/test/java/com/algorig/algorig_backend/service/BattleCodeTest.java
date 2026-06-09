@@ -23,9 +23,9 @@ class BattleCodeTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // BattleService has 8 required-arg dependencies via @RequiredArgsConstructor.
+        // BattleService has 9 required-arg dependencies via @RequiredArgsConstructor.
         // generateBattleCode() uses only static constants; all deps can be null.
-        battleService = new BattleService(null, null, null, null, null, null, null, null);
+        battleService = new BattleService(null, null, null, null, null, null, null, null, null);
 
         generateBattleCode = BattleService.class.getDeclaredMethod("generateBattleCode");
         generateBattleCode.setAccessible(true);

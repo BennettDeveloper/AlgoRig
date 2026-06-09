@@ -333,7 +333,7 @@ export default function ScriptDetail() {
         name: script.name,
         content: script.content,
         ownerUsername: script.ownerUsername,
-        requiredRobotIds: script.requiredRobotIds || [],
+        requiredTiers: script.requiredTiers || [],
       })
     )
     navigate('/battles/new')
@@ -423,20 +423,32 @@ export default function ScriptDetail() {
         </span>
       </div>
 
-      {/* Required robots */}
-      {script.hasRequirements && script.requiredRobots?.length > 0 && (
+      {/* Required tiers */}
+      {script.requiredTiers?.length > 0 && (
         <div>
           <div style={{
             fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
             letterSpacing: '0.15em', color: '#f97316', fontWeight: 700,
             marginBottom: 10,
           }}>
-            REQUIRED ROBOTS
+            REQUIRED TIERS
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {script.requiredRobots.map(robot => (
-              <RobotChip key={robot.id} robot={robot} />
-            ))}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {script.requiredTiers.map(tierKey => {
+              const tierNum = parseInt(tierKey.replace('TIER_', ''), 10)
+              const color = ROBOT_TIER_COLORS[tierNum] || '#6b7280'
+              return (
+                <span key={tierKey} style={{
+                  display: 'inline-flex', alignItems: 'center',
+                  padding: '4px 12px', borderRadius: 20,
+                  border: `1px solid ${color}50`,
+                  color, background: `${color}12`,
+                  fontSize: 13, fontWeight: 600,
+                }}>
+                  Tier {tierNum}
+                </span>
+              )
+            })}
           </div>
         </div>
       )}

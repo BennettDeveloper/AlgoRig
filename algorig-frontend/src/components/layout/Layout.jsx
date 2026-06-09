@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import Navbar from './Navbar'
 import LeftPanel from './LeftPanel'
 import RightPanel from './RightPanel'
+import SharedRobotCanvas from '../three/SharedRobotCanvas'
 
 export default function Layout() {
   const location = useLocation()
@@ -10,15 +11,18 @@ export default function Layout() {
     || location.pathname.startsWith('/battles/')
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Navbar />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {!isScriptEditor && <LeftPanel />}
-        <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-          <Outlet />
-        </main>
-        {!isScriptEditor && <RightPanel />}
+    <>
+      <SharedRobotCanvas />
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Navbar />
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {!isScriptEditor && <LeftPanel />}
+          <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+            <Outlet />
+          </main>
+          {!isScriptEditor && <RightPanel />}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

@@ -24,6 +24,5 @@ public class ScriptSummaryDto {
     @JsonProperty("isPublic")
     private boolean isPublic;
     private ScriptStatsDto stats;
-    private List<Long> requiredRobotIds;
-    private boolean hasRequirements;
+    private List<String> requiredTiers;
 }
