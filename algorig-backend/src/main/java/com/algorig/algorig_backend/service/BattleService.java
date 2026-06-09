@@ -95,10 +95,11 @@ public class BattleService {
                 throw new IllegalArgumentException("userCustomRobotId is required when userRobotType is CUSTOM.");
             CustomRobot cr = customRobotRepository.findById(customId)
                     .orElseThrow(() -> new RuntimeException("Custom robot A not found: " + customId));
-            if (cr.getTier().getValue() > request.getTierCap())
+            List<Integer> allowedA = request.getAllowedTiers();
+            if (allowedA != null && !allowedA.isEmpty() && !allowedA.contains(cr.getTier().getValue()))
                 throw new IllegalArgumentException(
                         "Custom robot '" + cr.getName() + "' is Tier " + cr.getTier().getValue()
-                        + " but the tier cap is " + request.getTierCap() + ".");
+                        + " but the allowed tiers are " + allowedA + ".");
             robotA = toRobotEntity(cr);
             robotAIdForRecord = customId;
         } else {
@@ -116,10 +117,11 @@ public class BattleService {
                 throw new IllegalArgumentException("enemyCustomRobotId is required when enemyRobotType is CUSTOM.");
             CustomRobot cr = customRobotRepository.findById(customId)
                     .orElseThrow(() -> new RuntimeException("Custom robot B not found: " + customId));
-            if (cr.getTier().getValue() > request.getTierCap())
+            List<Integer> allowedB = request.getAllowedTiers();
+            if (allowedB != null && !allowedB.isEmpty() && !allowedB.contains(cr.getTier().getValue()))
                 throw new IllegalArgumentException(
                         "Custom robot '" + cr.getName() + "' is Tier " + cr.getTier().getValue()
-                        + " but the tier cap is " + request.getTierCap() + ".");
+                        + " but the allowed tiers are " + allowedB + ".");
             robotB = toRobotEntity(cr);
             robotBIdForRecord = customId;
         } else {

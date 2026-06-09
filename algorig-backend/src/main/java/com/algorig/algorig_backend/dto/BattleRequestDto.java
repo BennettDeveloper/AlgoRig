@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 @NoArgsConstructor(onConstructor_ = @JsonCreator)
 @AllArgsConstructor
@@ -17,7 +20,7 @@ public class BattleRequestDto {
     private Long scriptBId;
 
     @Builder.Default
-    private int tierCap = 5;
+    private List<Integer> allowedTiers = new ArrayList<>(List.of(1, 2, 3, 4, 5));
 
     @Builder.Default
     private int maxTurns = 200;

@@ -17,6 +17,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -171,6 +172,13 @@ public class CustomRobotService {
         return customRobotRepository.findByIdAndUserId(id, getCurrentUserId())
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Custom robot not found or does not belong to you. id=" + id));
+    }
+
+    public List<CustomRobotResponse> getAllCustomRobots() {
+        return customRobotRepository.findAll()
+                .stream()
+                .map(CustomRobotResponse::fromEntity)
+                .collect(Collectors.toList());
     }
 
     private void validate(CustomRobotRequest req, Long excludeId, Long userId) {

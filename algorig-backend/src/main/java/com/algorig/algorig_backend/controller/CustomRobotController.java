@@ -50,6 +50,11 @@ public class CustomRobotController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/public")
+    public ResponseEntity<List<CustomRobotResponse>> getPublicRobots() {
+        return ResponseEntity.ok(customRobotService.getAllCustomRobots());
+    }
+
     // ── Local exception handlers ──────────────────────────────────────────────
 
     @ExceptionHandler(IllegalArgumentException.class)
