@@ -17,21 +17,14 @@ const tierColors = {
   5: '#f97316',
 }
 
-function buildRequiredTierText(tiers) {
-  const sorted = [...tiers].sort()
-  const labels = sorted.map(t => `Tier ${t.replace('TIER_', '')}`)
-  if (labels.length === 1) return labels[0]
-  return `${labels.slice(0, -1).join(', ')} or ${labels[labels.length - 1]}`
-}
-
 function getSpecialization(robot) {
   if (!robot) return null
   const stats = {
-    ATTACKER: robot.coreImpact      || 0,
-    DEFENDER: robot.chassisArmor    || 0,
-    SPEEDSTER: robot.clockSpeed     || 0,
-    HACKER: robot.exploitPower      || 0,
-    HEALER: robot.recovery          || 0,
+    ATTACKER:  robot.coreImpact   || 0,
+    DEFENDER:  robot.chassisArmor || 0,
+    SPEEDSTER: robot.clockSpeed   || 0,
+    HACKER:    robot.exploitPower || 0,
+    HEALER:    robot.recovery     || 0,
   }
   return Object.entries(stats).sort((a, b) => b[1] - a[1])[0][0]
 }
@@ -107,7 +100,7 @@ export default function BattleLauncher() {
   const [scriptA, setScriptA] = useState(null)
   const [scriptB, setScriptB] = useState(null)
   const [sameScript, setSameScript] = useState(true)
-  const [tierCap, setTierCap] = useState(5)
+  const [allowedTiers, setAllowedTiers] = useState([1, 2, 3, 4, 5])
   const [maxTurns, setMaxTurns] = useState(200)
 
   const [step, setStep] = useState(1)
@@ -116,18 +109,26 @@ export default function BattleLauncher() {
 
   const [challengeScript, setChallengeScript] = useState(null)
 
-  useEffect(() => {
-    const stored = sessionStorage.getItem('challenge_script')
-    if (stored) {
-      sessionStorage.removeItem('challenge_script')
-      try {
-        setChallengeScript(JSON.parse(stored))
-        setSameScript(false)
-      } catch (e) {
-        console.error('Failed to parse challenge script', e)
+useEffect(() => {
+  const stored = sessionStorage.getItem('challenge_script')
+  if (stored) {
+    sessionStorage.removeItem('challenge_script')
+    try {
+      const parsed = JSON.parse(stored)
+      setChallengeScript(parsed)
+      setSameScript(false)
+
+      // Pre-populate tier filter from script requirements
+      if (parsed.requiredTiers?.length > 0) {
+        const tierNums = parsed.requiredTiers.map(t => parseInt(t.replace('TIER_', '')))
+        setAllowedTiers(tierNums)
       }
+
+    } catch (e) {
+      console.error('Failed to parse challenge script', e)
     }
-  }, [])
+  }
+}, [])
 
   useEffect(() => {
     Promise.all([
@@ -142,7 +143,7 @@ export default function BattleLauncher() {
   }, [])
 
   const pickerRobots = robots
-    .filter(r => r.tier <= tierCap)
+    .filter(r => allowedTiers.includes(r.tier) || allowedTiers.includes(parseInt(r.tier)))
     .filter(r => !robotSearch || r.name.toLowerCase().includes(robotSearch.toLowerCase()))
 
   function openPicker(slot) {
@@ -170,7 +171,7 @@ export default function BattleLauncher() {
         robotBId:           robotB.isCustom ? undefined : robotB.id,
         scriptAId:          scriptA.id,
         scriptBId:          sameScript ? scriptA.id : (challengeScript ? challengeScript.id : scriptB?.id),
-        tierCap,
+        allowedTiers,
         maxTurns,
         userRobotType:      robotA.isCustom ? 'CUSTOM' : 'PRESET',
         enemyRobotType:     robotB.isCustom ? 'CUSTOM' : 'PRESET',
@@ -191,14 +192,6 @@ export default function BattleLauncher() {
 
   const canProceedStep1 = Boolean(robotA && robotB)
   const canProceedStep2 = Boolean(scriptA && (sameScript || scriptB || challengeScript))
-
-  // Tier requirements for whichever slot the picker is currently open for
-  const activeScript = pickingSlot === 'A' ? scriptA : (challengeScript ?? scriptB)
-  const activeReqTiers = activeScript?.requiredTiers || []
-  const pickerSelectedRobot = pickingSlot === 'A' ? robotA : pickingSlot === 'B' ? robotB : null
-  const pickerSelectedViolatesReq = activeReqTiers.length > 0 &&
-    pickerSelectedRobot != null &&
-    !activeReqTiers.includes(`TIER_${pickerSelectedRobot.tier}`)
 
   const backBtnStyle = {
     padding: '10px 20px', borderRadius: 8, fontSize: 13, fontFamily: 'inherit',
@@ -232,7 +225,9 @@ export default function BattleLauncher() {
     )
   }
 
-  // Robot slot panel (called as a function, not a component, to avoid remount)
+  // Robot slot panel — called as a function to avoid remount.
+  // When picker is open, suppress 3D preview to prevent ghost Views from leaking
+  // outside the picker canvas bounds.
   function renderSlotPanel(slot) {
     const robot = slot === 'A' ? robotA : robotB
     const accentColor = slot === 'A' ? '#f97316' : '#a855f7'
@@ -248,7 +243,17 @@ export default function BattleLauncher() {
               boxShadow: `0 0 20px ${color}40`,
               pointerEvents: 'none', zIndex: 1,
             }} />
-            <RobotCard robot={robot} onClick={() => {}} />
+            {pickingSlot ? (
+              <div style={{
+                width: '100%', height: 160,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: 0.3,
+              }}>
+                <span style={{ fontSize: 40 }}>⬡</span>
+              </div>
+            ) : (
+              <RobotCard robot={robot} onClick={() => {}} />
+            )}
           </div>
           <button
             onClick={() => openPicker(slot)}
@@ -333,7 +338,6 @@ export default function BattleLauncher() {
         </div>
 
         {!isA && !sameScript && challengeScript ? (
-          // Challenge script display for slot B
           <div style={{
             background: 'rgba(249,115,22,0.06)',
             border: '1px solid rgba(249,115,22,0.25)',
@@ -473,35 +477,50 @@ export default function BattleLauncher() {
             </div>
           </div>
 
-          {/* Tier cap */}
-          <div data-tour="tier-cap" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-            <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.12em', color: '#555577', width: 72 }}>
-              TIER CAP
-            </span>
-            {[1, 2, 3, 4, 5].map(t => {
-              const active = tierCap === t
-              const tc = tierColors[t]
-              return (
-                <button
-                  key={t}
-                  onClick={() => {
-                    setTierCap(t)
-                    if (robotA?.tier > t) setRobotA(null)
-                    if (robotB?.tier > t) setRobotB(null)
-                  }}
-                  style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: active ? `${tc}20` : 'rgba(255,255,255,0.03)',
-                    border: `2px solid ${active ? tc : 'rgba(255,255,255,0.08)'}`,
-                    color: active ? tc : '#555577',
-                    fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {t}
-                </button>
-              )
-            })}
+          {/* Allowed tiers — multi-select */}
+          <div data-tour="tier-cap" style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.12em', color: '#555577', width: 72 }}>
+                TIER FILTER
+              </span>
+              {[1, 2, 3, 4, 5].map(t => {
+                const active = allowedTiers.includes(t)
+                const tc = tierColors[t]
+                return (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      if (challengeScript) return
+                      if (active && allowedTiers.length === 1) return
+                      const next = active
+                        ? allowedTiers.filter(x => x !== t)
+                        : [...allowedTiers, t].sort((a, b) => a - b)
+                      setAllowedTiers(next)
+                      if (robotA && !next.includes(robotA.tier)) setRobotA(null)
+                      if (robotB && !next.includes(robotB.tier)) setRobotB(null)
+                    }}
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: active ? `${tc}20` : 'rgba(255,255,255,0.03)',
+                      border: `2px solid ${active ? tc : 'rgba(255,255,255,0.08)'}`,
+                      color: active ? tc : '#555577',
+                      fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{
+              paddingLeft: 84, marginTop: 6,
+              fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: '#444466',
+            }}>
+              {allowedTiers.length === 5
+                ? 'All tiers allowed'
+                : `Tier ${allowedTiers.join(', ')} only`}
+            </div>
           </div>
 
           {/* Max turns */}
@@ -569,22 +588,6 @@ export default function BattleLauncher() {
                 </button>
               </div>
 
-              {activeReqTiers.length > 0 && (
-                <div style={{
-                  background: 'rgba(249,115,22,0.06)',
-                  border: '1px solid rgba(249,115,22,0.3)',
-                  borderRadius: 8, padding: '8px 12px',
-                  marginBottom: 12, fontSize: 12, color: '#f97316',
-                }}>
-                  ⚠ This script requires {buildRequiredTierText(activeReqTiers)} robots only.
-                  {pickerSelectedViolatesReq && (
-                    <span style={{ display: 'block', marginTop: 4 }}>
-                      Your current selection doesn't qualify — please choose a different robot.
-                    </span>
-                  )}
-                </div>
-              )}
-
               {pickerRobots.length === 0 ? (
                 <div style={{
                   textAlign: 'center', padding: '32px 0',
@@ -599,52 +602,20 @@ export default function BattleLauncher() {
                 }}>
                   {pickerRobots.map(robot => {
                     const isOther = (pickingSlot === 'A' ? robotB : robotA)?.id === robot.id
-                    const tierBlocked = activeReqTiers.length > 0 &&
-                      !activeReqTiers.includes(`TIER_${robot.tier}`)
                     return (
                       <div
                         key={robot.id}
                         style={{
-                          position: 'relative',
-                          opacity: isOther ? 0.25 : tierBlocked ? 0.3 : 1,
+                          opacity: isOther ? 0.25 : 1,
                           pointerEvents: isOther ? 'none' : 'auto',
-                          cursor: tierBlocked ? 'not-allowed' : 'pointer',
-                          userSelect: tierBlocked ? 'none' : 'auto',
                           transition: 'opacity 0.15s ease',
                         }}
                       >
-                        <div style={{ pointerEvents: tierBlocked ? 'none' : 'auto' }}>
-                          <RobotCard
-                            robot={robot}
-                            onClick={() => selectRobot(robot)}
-                            pickerMode={true}
-                          />
-                        </div>
-                        {tierBlocked && (
-                          <>
-                            <div style={{
-                              position: 'absolute', inset: 0, zIndex: 10,
-                              cursor: 'not-allowed',
-                              borderRadius: 'inherit',
-                              background: 'rgba(0,0,0,0.01)',
-                            }} />
-                            <div style={{
-                              position: 'absolute', inset: 0,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              borderRadius: 'inherit',
-                              background: 'rgba(0,0,0,0.5)',
-                              pointerEvents: 'none',
-                            }}>
-                              <span style={{
-                                color: '#666', fontSize: 11,
-                                letterSpacing: 2, fontFamily: 'monospace',
-                                textTransform: 'uppercase',
-                              }}>
-                                WRONG TIER
-                              </span>
-                            </div>
-                          </>
-                        )}
+                        <RobotCard
+                          robot={robot}
+                          onClick={() => selectRobot(robot)}
+                          pickerMode={true}
+                        />
                       </div>
                     )
                   })}
@@ -854,8 +825,10 @@ export default function BattleLauncher() {
 
             <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
               <div style={{ fontSize: 13 }}>
-                <span style={{ color: '#555577', marginRight: 6 }}>Tier Cap</span>
-                <span style={{ color: tierColors[tierCap], fontWeight: 700 }}>{tierCap}</span>
+                <span style={{ color: '#555577', marginRight: 6 }}>Tiers</span>
+                <span style={{ color: '#f0f0ff', fontWeight: 700 }}>
+                  {allowedTiers.length === 5 ? 'All' : allowedTiers.join(', ')}
+                </span>
               </div>
               <div style={{ fontSize: 13 }}>
                 <span style={{ color: '#555577', marginRight: 6 }}>Max Turns</span>

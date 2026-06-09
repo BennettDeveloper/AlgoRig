@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import client from '../api/client'
-import { getMyRobots } from '../api/customRobotApi'
+import { getMyRobots, getPublicRobots } from '../api/customRobotApi'
 import RobotCard from '../components/robots/RobotCard'
 import RobotDetailModal from '../components/robots/RobotDetailModal'
 import { useAuth } from '../context/AuthContext'
@@ -40,12 +40,19 @@ export default function RobotBrowser() {
   }, [])
 
   // Fetch custom robots on mount when authenticated (so they appear in All/tier tabs immediately)
-  useEffect(() => {
-    if (!isAuthenticated) return
-    getMyRobots()
-      .then(data => setMyRobots(data.map(normalizeCustomRobot)))
-      .catch(() => setMyRobots([]))
-  }, [isAuthenticated])
+// NEW:
+useEffect(() => {
+  getPublicRobots()
+    .then(data => setMyRobots(data.map(normalizeCustomRobot)))
+    .catch(() => {
+      // fallback to own robots if public endpoint fails
+      if (isAuthenticated) {
+        getMyRobots()
+          .then(data => setMyRobots(data.map(normalizeCustomRobot)))
+          .catch(() => setMyRobots([]))
+      }
+    })
+}, [isAuthenticated])
 
   // Refresh custom robots when switching to the My Robots tab
   useEffect(() => {

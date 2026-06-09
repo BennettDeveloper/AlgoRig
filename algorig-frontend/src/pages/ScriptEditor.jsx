@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import client from '../api/client'
-import { createScript, updateScript as apiUpdateScript, getScriptDetail, updateRequiredTiers } from '../api/scripts'
+import { createScript, updateScript as apiUpdateScript, getScriptDetail } from '../api/scripts'
 import {
   DndContext,
   DragOverlay,
@@ -28,12 +28,6 @@ const TIER_CONFIG = [
   { key: 'TIER_5', label: 'Tier 5', color: '#facc15' },
 ]
 
-function buildTierStatusText(tiers) {
-  const sorted = [...tiers].sort()
-  const labels = sorted.map(t => `Tier ${t.replace('TIER_', '')}`)
-  if (labels.length === 1) return `${labels[0]} robots only`
-  return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]} robots only`
-}
 
 const ModeButton = ({ active, onClick, children }) => (
   <button
@@ -200,10 +194,6 @@ export default function ScriptEditor() {
   const [saveError, setSaveError] = useState('')
 
   const [requiredTiers, setRequiredTiers]                         = useState([])
-  const [selectedTiers, setSelectedTiers]                         = useState([])
-  const [savingTiers, setSavingTiers]                             = useState(false)
-  const [tierSaveError, setTierSaveError]                         = useState('')
-  const [showRobotPicker, setShowRobotPicker]                     = useState(false)
   const [showStatsResetWarning, setShowStatsResetWarning]         = useState(false)
   const [pendingSavePayload, setPendingSavePayload]               = useState(null)
   const [originalContent, setOriginalContent]                     = useState('')
@@ -250,25 +240,6 @@ export default function ScriptEditor() {
       console.error('Failed to save:', err)
     } finally {
       setIsSaving(false)
-    }
-  }
-
-  async function handleSaveTierRequirements() {
-    if (scriptId) {
-      setSavingTiers(true)
-      setTierSaveError('')
-      try {
-        await updateRequiredTiers(scriptId, selectedTiers)
-        setRequiredTiers(selectedTiers)
-        setShowRobotPicker(false)
-      } catch (err) {
-        setTierSaveError('Failed to save tier requirements. Please try again.')
-      } finally {
-        setSavingTiers(false)
-      }
-    } else {
-      setRequiredTiers(selectedTiers)
-      setShowRobotPicker(false)
     }
   }
 
@@ -564,23 +535,21 @@ export default function ScriptEditor() {
         </div>
       </div>
 
-      {/* Tier requirements strip */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '8px 24px',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'rgba(0,0,0,0.15)',
-        flexShrink: 0,
-      }}>
-        <span style={{
-          fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
-          letterSpacing: '0.12em', color: '#555577',
+      {/* Tier requirements strip — read-only informational display */}
+      {requiredTiers.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '8px 24px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: 'rgba(0,0,0,0.15)',
+          flexShrink: 0,
         }}>
-          TIER REQUIREMENTS
-        </span>
-        {requiredTiers.length === 0 ? (
-          <span style={{ fontSize: 12, color: '#444466' }}>All robots allowed</span>
-        ) : (
+          <span style={{
+            fontSize: 10, fontFamily: 'JetBrains Mono, monospace',
+            letterSpacing: '0.12em', color: '#555577',
+          }}>
+            TIER REQUIREMENTS
+          </span>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {requiredTiers.map(tierKey => {
               const cfg = TIER_CONFIG.find(c => c.key === tierKey)
@@ -599,23 +568,8 @@ export default function ScriptEditor() {
               )
             })}
           </div>
-        )}
-        <button
-          onClick={() => { setSelectedTiers(requiredTiers); setTierSaveError(''); setShowRobotPicker(true) }}
-          style={{
-            padding: '4px 12px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 6, color: '#8888aa',
-            fontSize: 12, cursor: 'pointer',
-            fontFamily: 'inherit', transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#f0f0ff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#8888aa'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
-        >
-          {requiredTiers.length === 0 ? '+ Set Tier Requirements' : '✏️ Edit Tier Requirements'}
-        </button>
-      </div>
+        </div>
+      )}
 
       {saveError && (
         <div style={{
@@ -750,83 +704,6 @@ export default function ScriptEditor() {
         </div>
       </Modal>
 
-      <Modal
-        isOpen={showRobotPicker}
-        onClose={() => setShowRobotPicker(false)}
-        title="Set Tier Requirements"
-        width="520px"
-      >
-        <p style={{ color: '#8888aa', fontSize: 13, lineHeight: 1.5, margin: '0 0 20px' }}>
-          Restrict which robot tiers can use this script. Leave all unselected to allow any robot.
-        </p>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-          {TIER_CONFIG.map(({ key, label, color }) => {
-            const isSelected = selectedTiers.includes(key)
-            return (
-              <button
-                key={key}
-                onClick={() => setSelectedTiers(prev =>
-                  prev.includes(key) ? prev.filter(t => t !== key) : [...prev, key]
-                )}
-                style={{
-                  minWidth: 90, padding: '10px 20px', borderRadius: 8,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  fontSize: 13, fontWeight: isSelected ? 700 : 400,
-                  transition: '0.15s all ease',
-                  background: isSelected ? `${color}33` : '#1a1a1a',
-                  border: `1px solid ${isSelected ? color : '#333'}`,
-                  color: isSelected ? color : '#666',
-                }}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-        <div style={{ marginBottom: 20, minHeight: 20 }}>
-          {selectedTiers.length === 0 ? (
-            <span style={{ color: '#666', fontStyle: 'italic', fontSize: 13 }}>All robots allowed</span>
-          ) : (
-            <span style={{ color: '#ff6600', fontSize: 13 }}>
-              {buildTierStatusText(selectedTiers)}
-            </span>
-          )}
-        </div>
-        {tierSaveError && (
-          <div style={{
-            color: '#ff6b6b', fontSize: 12, marginBottom: 12,
-            padding: '8px 12px', background: 'rgba(255,107,107,0.08)',
-            border: '1px solid rgba(255,107,107,0.2)', borderRadius: 6,
-          }}>
-            {tierSaveError}
-          </div>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button
-            onClick={() => setSelectedTiers([])}
-            style={{
-              background: 'none', border: 'none',
-              color: '#666', fontSize: 13, cursor: 'pointer',
-              fontFamily: 'inherit', padding: '9px 0',
-            }}
-          >
-            Clear All
-          </button>
-          <button
-            onClick={handleSaveTierRequirements}
-            disabled={savingTiers}
-            style={{
-              padding: '9px 24px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-              background: savingTiers ? 'rgba(255,102,0,0.5)' : '#ff6600',
-              border: 'none', color: '#fff',
-              cursor: savingTiers ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            {savingTiers ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-      </Modal>
     </div>
     </TooltipProvider>
   )
